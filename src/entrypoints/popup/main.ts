@@ -3,6 +3,45 @@ import { copyToClipboard } from "../../utils/elementorExporter";
 
 let currentData: ExtractedStyles | null = null;
 
+function sendMessageToTab(
+  tabId: number,
+  message: Record<string, unknown>
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const maxRetries = 3;
+    let attempt = 0;
+
+    function trySend() {
+      attempt++;
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          if (attempt < maxRetries) {
+            setTimeout(trySend, 300 * attempt);
+          } else {
+            reject(new Error(chrome.runtime.lastError.message));
+          }
+          return;
+        }
+        resolve(response);
+      });
+    }
+
+    trySend();
+  });
+}
+
+async function ensureContentScript(tabId: number): Promise<boolean> {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["/content-scripts/content.js"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const serverInfo = document.getElementById("server-info")!;
   const cdnInfo = document.getElementById("cdn-info")!;
@@ -17,6 +56,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const outputText = document.getElementById("output-text") as HTMLTextAreaElement;
   const btnOpenPanel = document.getElementById("btn-open-panel")!;
 
+  let tabId: number | undefined;
+
   try {
     const [tab] = await chrome.tabs.query({
       active: true,
@@ -28,86 +69,97 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    tabId = tab.id;
+
+    const url = tab.url || "";
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["content.js"],
-      });
+      const resp = await fetch(url, { method: "HEAD" });
+      const server = resp.headers.get("server") || "Unknown";
+      serverInfo.textContent = server;
+
+      const via = resp.headers.get("via") || "";
+      const cfRay = resp.headers.get("cf-ray");
+      cdnInfo.textContent = cfRay
+        ? "Cloudflare"
+        : via
+          ? via.split(",")[0].trim()
+          : "None";
     } catch {
-      // Content script already injected
+      serverInfo.textContent = "CORS restricted";
+      cdnInfo.textContent = "Cannot detect";
     }
 
-    chrome.tabs.sendMessage(tab.id, { type: "detect" }, (response) => {
-      if (chrome.runtime.lastError || !response) {
-        serverInfo.textContent = "Cannot detect";
-        serverInfo.classList.add("warning");
-        return;
-      }
+    await ensureContentScript(tabId);
+    await new Promise((r) => setTimeout(r, 200));
 
-      wpStatus.textContent = response.isWordPress ? "Yes" : "No";
-      wpStatus.classList.add(response.isWordPress ? "success" : "danger");
+    try {
+      const detectResponse = (await sendMessageToTab(tabId, {
+        type: "detect",
+      })) as {
+        isWordPress?: boolean;
+        isElementor?: boolean;
+        kitId?: string | null;
+      } | null;
 
-      elementorStatus.textContent = response.isElementor ? "Yes" : "No";
-      elementorStatus.classList.add(response.isElementor ? "success" : "danger");
+      if (detectResponse) {
+        wpStatus.textContent = detectResponse.isWordPress ? "Yes" : "No";
+        wpStatus.classList.add(detectResponse.isWordPress ? "success" : "danger");
 
-      kitId.textContent = response.kitId || "-";
+        elementorStatus.textContent = detectResponse.isElementor ? "Yes" : "No";
+        elementorStatus.classList.add(
+          detectResponse.isElementor ? "success" : "danger"
+        );
 
-      if (response.isElementor) {
-        elementorActions.style.display = "block";
-      }
+        kitId.textContent = detectResponse.kitId || "-";
 
-      serverInfo.textContent = "Detected";
-      serverInfo.classList.add("success");
-      cdnInfo.textContent = "Checking...";
-    });
-
-    chrome.tabs.sendMessage(
-      tab.id,
-      { type: "extract" },
-      (extractResponse: { success?: boolean; data?: ExtractedStyles }) => {
-        if (extractResponse?.success && extractResponse.data) {
-          currentData = extractResponse.data;
-
-          serverInfo.textContent = currentData.server.server;
-          cdnInfo.textContent = currentData.server.cdn || "None";
-
-          btnCopyJson.style.display = "inline-flex";
-          btnCopyCss.style.display = "inline-flex";
+        if (detectResponse.isElementor) {
+          elementorActions.style.display = "block";
         }
+      } else {
+        wpStatus.textContent = "No response";
+        wpStatus.classList.add("warning");
+        elementorStatus.textContent = "No response";
+        elementorStatus.classList.add("warning");
       }
-    );
+    } catch (err) {
+      wpStatus.textContent = "Error";
+      wpStatus.classList.add("danger");
+      elementorStatus.textContent = "Error";
+      elementorStatus.classList.add("danger");
+    }
   } catch (err) {
     serverInfo.textContent = "Error";
     serverInfo.classList.add("danger");
   }
 
   btnExtract.addEventListener("click", async () => {
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-
-    if (!tab?.id) return;
+    if (!tabId) return;
 
     btnExtract.textContent = "Extracting...";
     (btnExtract as HTMLButtonElement).disabled = true;
 
-    chrome.tabs.sendMessage(
-      tab.id,
-      { type: "extract" },
-      (response: { success?: boolean; data?: ExtractedStyles }) => {
-        btnExtract.textContent = "Extract Styles";
-        (btnExtract as HTMLButtonElement).disabled = false;
+    try {
+      await ensureContentScript(tabId);
+      await new Promise((r) => setTimeout(r, 200));
 
-        if (response?.success && response.data) {
-          currentData = response.data;
-          outputArea.style.display = "block";
-          outputText.value = JSON.stringify(response.data, null, 2);
-          btnCopyJson.style.display = "inline-flex";
-          btnCopyCss.style.display = "inline-flex";
-        }
+      const response = (await sendMessageToTab(tabId, {
+        type: "extract",
+      })) as { success?: boolean; data?: ExtractedStyles } | null;
+
+      btnExtract.textContent = "Extract Styles";
+      (btnExtract as HTMLButtonElement).disabled = false;
+
+      if (response?.success && response.data) {
+        currentData = response.data;
+        outputArea.style.display = "block";
+        outputText.value = JSON.stringify(response.data, null, 2);
+        btnCopyJson.style.display = "inline-flex";
+        btnCopyCss.style.display = "inline-flex";
       }
-    );
+    } catch {
+      btnExtract.textContent = "Extract Styles";
+      (btnExtract as HTMLButtonElement).disabled = false;
+    }
   });
 
   btnCopyJson.addEventListener("click", () => {

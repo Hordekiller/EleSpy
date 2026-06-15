@@ -69,8 +69,8 @@ function extractKitData(): ElementorKit | null {
   return kit;
 }
 
-function extractGlobalColors() {
-  const colors: Record<string, { value: string; name: string }> = {};
+function extractGlobalColors(): Record<string, import("../types/elementor").ElementorColor> {
+  const colors: Record<string, import("../types/elementor").ElementorColor> = {};
   const colorVars = document.documentElement;
 
   const rootStyles = getComputedStyle(colorVars);
@@ -88,7 +88,7 @@ function extractGlobalColors() {
   for (const name of varNames) {
     const value = rootStyles.getPropertyValue(`--e-global-color-${name}`).trim();
     if (value) {
-      colors[name] = { value, name: name.charAt(0).toUpperCase() + name.slice(1) };
+      colors[name] = { _id: name, title: name.charAt(0).toUpperCase() + name.slice(1), color: value };
     }
   }
 
@@ -103,8 +103,9 @@ function extractGlobalColors() {
       const varValue = match[2].trim();
       if (!colors[varName]) {
         colors[varName] = {
-          value: varValue,
-          name: varName.charAt(0).toUpperCase() + varName.slice(1),
+          _id: varName,
+          title: varName.charAt(0).toUpperCase() + varName.slice(1),
+          color: varValue,
         };
       }
     }
@@ -113,8 +114,8 @@ function extractGlobalColors() {
   return colors;
 }
 
-function extractGlobalTypography() {
-  const typography: Record<string, Record<string, unknown>> = {};
+function extractGlobalTypography(): Record<string, import("../types/elementor").ElementorTypography> {
+  const typography: Record<string, import("../types/elementor").ElementorTypography> = {};
   const rootStyles = getComputedStyle(document.documentElement);
 
   const fontVars = ["primary", "secondary", "text", "accent"];
@@ -125,8 +126,11 @@ function extractGlobalTypography() {
       .trim();
     if (family) {
       typography[name] = {
-        font_family: family,
-        font_size: {
+        _id: name,
+        title: name.charAt(0).toUpperCase() + name.slice(1),
+        typography_typography: "custom",
+        typography_font_family: family,
+        typography_font_size: {
           unit: "px",
           size: parseInt(
             rootStyles
@@ -134,6 +138,12 @@ function extractGlobalTypography() {
               .trim() || "16"
           ),
         },
+        typography_font_weight: "400",
+        typography_line_height: { unit: "em", size: 1.5 },
+        typography_letter_spacing: { unit: "px", size: 0 },
+        typography_font_style: "",
+        typography_text_decoration: "",
+        typography_text_transform: "",
       };
     }
   }
@@ -147,7 +157,19 @@ function extractGlobalTypography() {
     for (const match of familyMatches) {
       const varName = match[1];
       if (!typography[varName]) {
-        typography[varName] = { font_family: match[2].trim() };
+        typography[varName] = {
+          _id: varName,
+          title: varName.charAt(0).toUpperCase() + varName.slice(1),
+          typography_typography: "custom",
+          typography_font_family: match[2].trim(),
+          typography_font_size: { unit: "px", size: 16 },
+          typography_font_weight: "400",
+          typography_line_height: { unit: "em", size: 1.5 },
+          typography_letter_spacing: { unit: "px", size: 0 },
+          typography_font_style: "",
+          typography_text_decoration: "",
+          typography_text_transform: "",
+        };
       }
     }
   }

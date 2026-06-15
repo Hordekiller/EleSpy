@@ -48,7 +48,7 @@ temp/
 
 # Plan file (not for GitHub)
 PLAN.md
-
+Ruls.md
 # Editor configs
 .editorconfig
 .eslintrc.js

@@ -14,7 +14,7 @@ export async function extractStyles(): Promise<ExtractedStyles> {
   const inlineStyles = extractInlineStyles();
   const stylesheetUrls = extractStylesheetUrls();
   const rawCSS = extractRawCSS();
-  const generatedCSS = generateCleanCSS(elementor.cssVariables || {});
+  const generatedCSS = generateCleanCSS(cssVariables);
 
   return {
     server,
