@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="panel-container">
+    <header class="panel-header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="#92003B" stroke-width="2"/>
+          <path d="M12 6v12M6 12h12" stroke="#92003B" stroke-width="2"/>
+        </svg>
+        <h1>EleSpy</h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-refresh" class="icon-btn" title="Refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="panel-tabs">
+      <button class="tab active" data-tab="detect">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+        Detect
+      </button>
+      <button class="tab" data-tab="styles">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/>
+        </svg>
+        Styles
+      </button>
+      <button class="tab" data-tab="export">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7,10 12,15 17,10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Export
+      </button>
+      <button class="tab" data-tab="import">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17,8 12,3 7,8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Import
+      </button>
+    </nav>
+
+    <main class="panel-content">
+      <div id="tab-detect" class="tab-panel active">
+        <section class="card">
+          <h3>Server Information</h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Server</span>
+              <span id="p-server" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">CDN</span>
+              <span id="p-cdn" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">SSL</span>
+              <span id="p-ssl" class="info-value">-</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>CMS Detection</h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">WordPress</span>
+              <span id="p-wp" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Elementor</span>
+              <span id="p-elementor" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Elementor Pro</span>
+              <span id="p-elementor-pro" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Kit ID</span>
+              <span id="p-kit-id" class="info-value">-</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="tab-styles" class="tab-panel">
+        <section class="card">
+          <h3>Global Colors</h3>
+          <div id="p-colors" class="color-grid"></div>
+        </section>
+
+        <section class="card">
+          <h3>Global Typography</h3>
+          <div id="p-typography" class="typography-list"></div>
+        </section>
+
+        <section class="card">
+          <h3>CSS Variables</h3>
+          <button id="btn-copy-vars" class="btn btn-sm">Copy All Variables</button>
+          <div id="p-css-vars" class="code-block"></div>
+        </section>
+      </div>
+
+      <div id="tab-export" class="tab-panel">
+        <section class="card">
+          <h3>Export Options</h3>
+          <div class="export-options">
+            <button id="btn-export-json" class="btn btn-primary">
+              Download Kit JSON
+            </button>
+            <button id="btn-export-css" class="btn btn-secondary">
+              Download CSS
+            </button>
+            <button id="btn-copy-full" class="btn btn-secondary">
+              Copy Full Data
+            </button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Export Preview</h3>
+          <div id="export-preview" class="code-block"></div>
+        </section>
+      </div>
+
+      <div id="tab-import" class="tab-panel">
+        <section class="card">
+          <h3>Import Instructions</h3>
+          <div id="import-instructions" class="instructions"></div>
+        </section>
+
+        <section class="card">
+          <h3>Quick Actions</h3>
+          <div class="export-options">
+            <button id="btn-copy-kit" class="btn btn-primary">
+              Copy Kit for Import
+            </button>
+            <button id="btn-copy-instructions" class="btn btn-secondary">
+              Copy Instructions
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div id="notification" class="notification" style="display: none;">
+      <span id="notification-text"></span>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

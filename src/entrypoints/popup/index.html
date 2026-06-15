@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="#92003B" stroke-width="2"/>
+          <path d="M12 6v12M6 12h12" stroke="#92003B" stroke-width="2"/>
+        </svg>
+        <h1>EleSpy</h1>
+      </div>
+      <span class="version">v1.0.0</span>
+    </header>
+
+    <main class="popup-main">
+      <section class="status-card">
+        <h2>Server Info</h2>
+        <div class="status-row">
+          <span class="label">Server:</span>
+          <span id="server-info" class="value">Checking...</span>
+        </div>
+        <div class="status-row">
+          <span class="label">CDN:</span>
+          <span id="cdn-info" class="value">Checking...</span>
+        </div>
+      </section>
+
+      <section class="status-card">
+        <h2>CMS Detection</h2>
+        <div class="status-row">
+          <span class="label">WordPress:</span>
+          <span id="wp-status" class="value">Checking...</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Elementor:</span>
+          <span id="elementor-status" class="value">Checking...</span>
+        </div>
+        <div class="status-row">
+          <span class="label">Kit ID:</span>
+          <span id="kit-id" class="value">-</span>
+        </div>
+      </section>
+
+      <section id="elementor-actions" class="actions-card" style="display: none;">
+        <h2>Elementor Tools</h2>
+        <button id="btn-extract" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7,10 12,15 17,10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Extract Styles
+        </button>
+        <div class="btn-group">
+          <button id="btn-copy-json" class="btn btn-secondary" style="display: none;">
+            Copy JSON
+          </button>
+          <button id="btn-copy-css" class="btn btn-secondary" style="display: none;">
+            Copy CSS
+          </button>
+        </div>
+        <div id="output-area" style="display: none;">
+          <textarea id="output-text" readonly></textarea>
+        </div>
+      </section>
+    </main>
+
+    <footer class="popup-footer">
+      <button id="btn-open-panel" class="btn btn-link">
+        Open Full Panel
+      </button>
+    </footer>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
