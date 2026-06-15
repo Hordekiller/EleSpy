@@ -59,3 +59,6 @@ prettier.config.js
 .wxt/
 wxt-types/
 web-ext.config.ts
+
+# Zips
+*.zip
