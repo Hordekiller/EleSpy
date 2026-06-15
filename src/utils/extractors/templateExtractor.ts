@@ -111,7 +111,7 @@ function extractElementForTemplate(el: HTMLElement): Record<string, unknown> | n
   }
 
   const result: Record<string, unknown> = {
-    id: el.getAttribute("data-id") || Math.random().toString(36).substring(2, 10),
+    id: el.getAttribute("data-id") || Math.random().toString(16).substring(2, 10),
     elType,
     isInner: classes.includes("elementor-inner-section"),
     settings: Object.keys(settings).length > 0 ? settings : [],
@@ -136,7 +136,7 @@ function extractWidgetForTemplate(el: HTMLElement): Record<string, unknown> | nu
   }
 
   return {
-    id: el.getAttribute("data-id") || Math.random().toString(36).substring(2, 10),
+    id: el.getAttribute("data-id") || Math.random().toString(16).substring(2, 10),
     elType: "widget",
     widgetType: cleanType,
     isInner: false,

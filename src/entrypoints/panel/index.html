@@ -118,19 +118,80 @@
           <div id="extraction-progress" class="progress-list" style="display:none;"></div>
         </section>
 
-        <section class="card">
-          <h3 data-i18n="export.options">گزینه‌های خروجی</h3>
-          <div class="export-options">
-            <button id="btn-export-json" class="btn btn-primary" data-i18n="export.template-json">دانلود Template JSON</button>
-            <button id="btn-export-kit" class="btn btn-secondary" data-i18n="export.kit-json">دانلود Kit JSON</button>
-            <button id="btn-export-css" class="btn btn-secondary" data-i18n="export.css">دانلود CSS</button>
-            <button id="btn-copy-full" class="btn btn-secondary" data-i18n="export.copy-full">کپی کامل</button>
+        <section class="card export-section" id="section-colors" style="display:none;">
+          <div class="section-header">
+            <h3 data-i18n="export.colors">رنگ‌های سراسری</h3>
+            <div class="section-actions">
+              <button class="btn btn-sm btn-copy-section" data-section="colors" data-i18n="export.copy">کپی</button>
+              <button class="btn btn-sm btn-download-section" data-section="colors" data-i18n="export.download">دانلود</button>
+            </div>
           </div>
+          <div id="export-colors" class="code-block"></div>
+        </section>
+
+        <section class="card export-section" id="section-typography" style="display:none;">
+          <div class="section-header">
+            <h3 data-i18n="export.typography">تایپوگرافی سراسری</h3>
+            <div class="section-actions">
+              <button class="btn btn-sm btn-copy-section" data-section="typography" data-i18n="export.copy">کپی</button>
+              <button class="btn btn-sm btn-download-section" data-section="typography" data-i18n="export.download">دانلود</button>
+            </div>
+          </div>
+          <div id="export-typography" class="code-block"></div>
+        </section>
+
+        <section class="card export-section" id="section-css" style="display:none;">
+          <div class="section-header">
+            <h3 data-i18n="export.css-variables">متغیرهای CSS</h3>
+            <div class="section-actions">
+              <button class="btn btn-sm btn-copy-section" data-section="css" data-i18n="export.copy">کپی</button>
+              <button class="btn btn-sm btn-download-section" data-section="css" data-i18n="export.download">دانلود</button>
+            </div>
+          </div>
+          <div id="export-css" class="code-block"></div>
+        </section>
+
+        <section class="card export-section" id="section-widgets" style="display:none;">
+          <div class="section-header">
+            <h3 data-i18n="export.widgets">ویجت‌ها</h3>
+            <div class="section-actions">
+              <button class="btn btn-sm btn-copy-section" data-section="widgets" data-i18n="export.copy">کپی</button>
+              <button class="btn btn-sm btn-download-section" data-section="widgets" data-i18n="export.download">دانلود</button>
+            </div>
+          </div>
+          <div id="export-widgets" class="code-block"></div>
+        </section>
+
+        <section class="card export-section" id="section-templates" style="display:none;">
+          <div class="section-header">
+            <h3 data-i18n="export.templates">قالب صفحه</h3>
+            <div class="section-actions">
+              <button class="btn btn-sm btn-copy-section" data-section="templates" data-i18n="export.copy">کپی</button>
+              <button class="btn btn-sm btn-download-section" data-section="templates" data-i18n="export.download">دانلود</button>
+            </div>
+          </div>
+          <div id="export-templates" class="code-block"></div>
+        </section>
+
+        <section class="card export-section" id="section-customcss" style="display:none;">
+          <div class="section-header">
+            <h3 data-i18n="export.custom-css">CSS سفارشی</h3>
+            <div class="section-actions">
+              <button class="btn btn-sm btn-copy-section" data-section="customcss" data-i18n="export.copy">کپی</button>
+              <button class="btn btn-sm btn-download-section" data-section="customcss" data-i18n="export.download">دانلود</button>
+            </div>
+          </div>
+          <div id="export-customcss" class="code-block"></div>
         </section>
 
         <section class="card">
-          <h3 data-i18n="export.preview">پیش‌نمایش</h3>
-          <div id="export-preview" class="code-block"></div>
+          <h3 data-i18n="export.all-options">همه گزینه‌ها</h3>
+          <div class="export-options">
+            <button id="btn-export-json" class="btn btn-primary" data-i18n="export.template-json">دانلود Template JSON</button>
+            <button id="btn-export-kit" class="btn btn-secondary" data-i18n="export.kit-json">دانلود Kit JSON</button>
+            <button id="btn-export-css-all" class="btn btn-secondary" data-i18n="export.css">دانلود CSS</button>
+            <button id="btn-copy-full" class="btn btn-secondary" data-i18n="export.copy-full">کپی همه</button>
+          </div>
         </section>
       </div>
 

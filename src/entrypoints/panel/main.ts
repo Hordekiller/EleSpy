@@ -179,15 +179,16 @@ function initEventListeners() {
     showNotification(t("notify.downloaded"));
   });
 
-  document.getElementById("btn-export-css")?.addEventListener("click", () => {
+  document.getElementById("btn-export-css-all")?.addEventListener("click", () => {
     if (!currentData) return;
     downloadCSS(currentData.generatedCSS);
     showNotification(t("notify.downloaded"));
   });
 
   document.getElementById("btn-copy-full")?.addEventListener("click", () => {
-    if (!currentData) return;
-    copyToClipboard(JSON.stringify(currentData, null, 2));
+    if (!fullKitData && !currentData) return;
+    const data = fullKitData || currentData;
+    copyToClipboard(JSON.stringify(data, null, 2));
     showNotification(t("notify.copied"));
   });
 
@@ -214,6 +215,31 @@ function initEventListeners() {
       copyToClipboard(instructions);
       showNotification(t("notify.copied"));
     });
+
+  document.querySelectorAll(".btn-copy-section").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const section = (btn as HTMLElement).getAttribute("data-section");
+      if (!section || !fullKitData) return;
+      const json = getSectionJSON(section);
+      if (json) {
+        copyToClipboard(json);
+        showNotification(t("notify.copied"));
+      }
+    });
+  });
+
+  document.querySelectorAll(".btn-download-section").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const section = (btn as HTMLElement).getAttribute("data-section");
+      if (!section || !fullKitData) return;
+      const json = getSectionJSON(section);
+      if (json) {
+        const hostname = window.location.hostname.replace(/[^a-zA-Z0-9.-]/g, "");
+        downloadJSONFile(JSON.parse(json), `elespy-${hostname}-${section}.json`);
+        showNotification(t("notify.downloaded"));
+      }
+    });
+  });
 
   document.getElementById("btn-extract-full")?.addEventListener("click", async () => {
     const progressEl = document.getElementById("extraction-progress");
@@ -474,10 +500,35 @@ function updateImportUI(_data: ExtractedStyles) {
 }
 
 function updateFullExportUI(data: FullKitResult) {
-  const preview = document.getElementById("export-preview");
-  if (preview) {
-    const kitJSON = buildKitJSON(data);
-    preview.textContent = JSON.stringify(kitJSON, null, 2);
+  const sections = [
+    { id: "colors", container: "export-colors", json: JSON.stringify(data.globalColors, null, 2) },
+    { id: "typography", container: "export-typography", json: JSON.stringify(data.globalTypography, null, 2) },
+    { id: "css", container: "export-css", json: JSON.stringify(data.cssVariables, null, 2) },
+    { id: "widgets", container: "export-widgets", json: JSON.stringify(data.widgets, null, 2) },
+    { id: "templates", container: "export-templates", json: JSON.stringify(data.templates, null, 2) },
+    { id: "customcss", container: "export-customcss", json: data.customCSS },
+  ];
+
+  for (const section of sections) {
+    const sectionEl = document.getElementById(`section-${section.id}`);
+    const containerEl = document.getElementById(section.container);
+    if (sectionEl && containerEl) {
+      sectionEl.style.display = "block";
+      containerEl.textContent = section.json;
+    }
+  }
+}
+
+function getSectionJSON(section: string): string | null {
+  if (!fullKitData) return null;
+  switch (section) {
+    case "colors": return JSON.stringify(fullKitData.globalColors, null, 2);
+    case "typography": return JSON.stringify(fullKitData.globalTypography, null, 2);
+    case "css": return JSON.stringify(fullKitData.cssVariables, null, 2);
+    case "widgets": return JSON.stringify(fullKitData.widgets, null, 2);
+    case "templates": return JSON.stringify(fullKitData.templates, null, 2);
+    case "customcss": return fullKitData.customCSS;
+    default: return null;
   }
 }
 

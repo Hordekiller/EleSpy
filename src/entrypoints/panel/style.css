@@ -670,3 +670,34 @@ body {
 .btn-full {
   width: 100%;
 }
+
+/* Export Sections */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.section-header h3 {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.section-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.section-actions .btn {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.export-section .code-block {
+  max-height: 200px;
+  font-size: 10px;
+}

@@ -2,7 +2,7 @@ import { detectAllTechnologies } from "../detectors";
 import { extractFullKit } from "../utils/extractors/kitBuilder";
 
 function generateId(): string {
-  return Math.random().toString(36).substring(2, 10);
+  return Math.random().toString(16).substring(2, 10);
 }
 
 function extractWidgetSettings(el: HTMLElement, widgetType: string): Record<string, unknown> {
