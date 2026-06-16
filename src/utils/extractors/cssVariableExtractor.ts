@@ -1,58 +1,60 @@
 import type { ElementorCSSVariable, ExtractorResult } from "../../types/elementor";
 
-function processVariable(
-  prop: string,
-  value: string,
-  source: string,
-  collected: Map<string, ElementorCSSVariable>
-): void {
-  if (!prop.startsWith("--e-")) return;
-  if (collected.has(prop)) return;
-  collected.set(prop, { name: prop, value, source });
-}
-
 export async function extractCSSVariables(): Promise<ExtractorResult<ElementorCSSVariable[]>> {
-  const collected = new Map<string, ElementorCSSVariable>();
+  const results: ElementorCSSVariable[] = [];
+  const seen = new Set<string>();
 
+  // 1. Collect from computed styles on documentElement
   try {
     const rootStyles = getComputedStyle(document.documentElement);
     for (let i = 0; i < rootStyles.length; i++) {
       const prop = rootStyles[i];
-      if (prop.startsWith("--e-")) {
+      if (prop.startsWith("--e-") && !seen.has(prop)) {
+        seen.add(prop);
         const value = rootStyles.getPropertyValue(prop).trim();
-        processVariable(prop, value, "computed", collected);
+        results.push({ name: prop, value, source: "computed" });
       }
     }
   } catch {}
 
+  // 2. Collect from all stylesheets
   for (const sheet of Array.from(document.styleSheets)) {
-    const source = (sheet as CSSStyleSheet).href || "inline";
     try {
       const rules = Array.from(sheet.cssRules || []);
       for (const rule of rules) {
         if (!(rule instanceof CSSStyleRule)) continue;
-        // Search in all selectors
         for (let i = 0; i < rule.style.length; i++) {
           const prop = rule.style[i];
-          if (prop.startsWith("--e-")) {
+          if (prop.startsWith("--e-") && !seen.has(prop)) {
+            seen.add(prop);
             const value = rule.style.getPropertyValue(prop).trim();
-            processVariable(prop, value, source, collected);
+            results.push({ name: prop, value, source: "stylesheet" });
           }
         }
       }
     } catch {}
   }
 
-  const styleTags = document.querySelectorAll("style");
-  for (const tag of styleTags) {
-    const text = tag.textContent || "";
-    const regex = /(--e-[a-zA-Z0-9_-]+)\s*:\s*([^;]+)/g;
-    let match = regex.exec(text);
-    while (match) {
-      processVariable(match[1], match[2].trim(), "inline-style", collected);
-      match = regex.exec(text);
-    }
+  // 3. Fallback: collect ALL CSS variables if none found
+  if (results.length === 0) {
+    try {
+      const elements = document.querySelectorAll("*");
+      for (let i = 0; i < Math.min(elements.length, 50); i++) {
+        try {
+          const el = elements[i] as HTMLElement;
+          const style = getComputedStyle(el);
+          for (let j = 0; j < style.length; j++) {
+            const prop = style[j];
+            if (prop.startsWith("--") && !seen.has(prop)) {
+              seen.add(prop);
+              const value = style.getPropertyValue(prop).trim();
+              results.push({ name: prop, value, source: "fallback" });
+            }
+          }
+        } catch {}
+      }
+    } catch {}
   }
 
-  return { success: true, data: Array.from(collected.values()) };
+  return { success: true, data: results };
 }

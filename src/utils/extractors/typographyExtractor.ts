@@ -285,8 +285,14 @@ export async function extractTypography(): Promise<ExtractorResult<ElementorTypo
     for (const t of fromCSS) merged.set(t._id, t);
     for (const t of fromConfig) merged.set(t._id, t);
 
-    return { success: true, data: Array.from(merged.values()) };
+    let result = Array.from(merged.values());
+    // Fallback to DOM if no global typography found
+    if (result.length === 0) {
+      result = extractFromDOMFonts();
+    }
+
+    return { success: true, data: result };
   } catch (error) {
-    return { success: true, data: extractFromCSSVariables(), error: String(error) };
+    return { success: true, data: extractFromDOMFonts(), error: String(error) };
   }
 }
