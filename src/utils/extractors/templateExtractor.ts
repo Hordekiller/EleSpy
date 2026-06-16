@@ -516,6 +516,16 @@ export function getAllElementorSections(): PageSection[] {
   return getAllSectionsFromDOM();
 }
 
+// Map DetectedSectionType to valid ElementorTemplate.type
+function mapToValidTemplateType(detected: DetectedSectionType): ElementorTemplate["type"] {
+  const validTypes: ElementorTemplate["type"][] = ["page", "section", "header", "footer", "popup", "single", "archive", "search", "error-404"];
+  if (validTypes.includes(detected as ElementorTemplate["type"])) {
+    return detected as ElementorTemplate["type"];
+  }
+  // Default "unknown" to "section"
+  return "section";
+}
+
 export function extractSelectedSections(sectionIds: string[]): ElementorTemplate[] {
   const templates: ElementorTemplate[] = [];
 
@@ -526,7 +536,7 @@ export function extractSelectedSections(sectionIds: string[]): ElementorTemplate
       templates.push({
         id: section.id as unknown as number,
         title: section.title,
-        type: section.sectionType,
+        type: mapToValidTemplateType(section.sectionType),
         content: JSON.stringify(section.element),
         pageSettings: {},
       });
@@ -540,7 +550,7 @@ export function extractSelectedSections(sectionIds: string[]): ElementorTemplate
         templates.push({
           id: id as unknown as number,
           title: `${sectionType} (#${id})`,
-          type: sectionType,
+          type: mapToValidTemplateType(sectionType),
           content: JSON.stringify(parseElementFromDOM(el) || {}),
           pageSettings: {},
         });
