@@ -82,6 +82,14 @@ const translations: Record<Lang, Record<string, string>> = {
     "notify.extracted": "استخراج کامل شد!",
     "notify.error": "خطا",
     "notify.no-tab": "تب فعالی یافت نشد",
+    "notify.detected": "بخش‌ها شناسایی شدند!",
+    "notify.no-sections": "بخشی یافت نشد",
+
+    // Export
+    "export.live-selection": "انتخاب زنده بخش‌ها",
+    "export.live-selection-desc": "انتخاب هدر، فوتر یا بخش خاص برای خروجی",
+    "export.detect-sections": "شناسایی بخش‌ها",
+    "export.no-sections": "بخش المنتوری یافت نشد",
 
     // General
     "general.yes": "بله",
@@ -177,6 +185,14 @@ const translations: Record<Lang, Record<string, string>> = {
     "notify.extracted": "Extraction complete!",
     "notify.error": "Error",
     "notify.no-tab": "No active tab found",
+    "notify.detected": "Sections detected!",
+    "notify.no-sections": "No sections found",
+
+    // Export
+    "export.live-selection": "Live Section Selection",
+    "export.live-selection-desc": "Select header, footer or specific section for export",
+    "export.detect-sections": "Detect Sections",
+    "export.no-sections": "No Elementor sections found",
 
     // General
     "general.yes": "Yes",

@@ -682,6 +682,21 @@ export default defineContentScript({
           return true;
         }
 
+        // Live section selection - get all elementor sections/containers for selection
+        if (request.type === "getSections") {
+          const sections = getAllElementorSections();
+          sendResponse({ success: true, data: sections });
+          return true;
+        }
+
+        // Extract selected sections by IDs
+        if (request.type === "extractSections") {
+          const sectionIds = request.sectionIds as string[] | undefined;
+          const sections = extractSelectedSections(sectionIds || []);
+          sendResponse({ success: true, data: sections });
+          return true;
+        }
+
         return false;
       }
     );

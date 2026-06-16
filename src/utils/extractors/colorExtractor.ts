@@ -14,28 +14,91 @@ function getFrontendConfig(): Record<string, unknown> | null {
   return null;
 }
 
+function getElementorDataElements(): Record<string, unknown> | null {
+  try {
+    // Try elementor data from data-elementor-common-data attribute
+    const dataEl = document.querySelector("[data-elementor-common-data]");
+    if (dataEl) {
+      const data = dataEl.getAttribute("data-elementor-common-data");
+      if (data) {
+        return JSON.parse(decodeURIComponent(data));
+      }
+    }
+    // Try from data-elementor-settings
+    const settingsEl = document.querySelector("[data-elementor-settings]");
+    if (settingsEl) {
+      const data = settingsEl.getAttribute("data-elementor-settings");
+      if (data) {
+        return JSON.parse(decodeURIComponent(data));
+      }
+    }
+  } catch {}
+  return null;
+}
+
 function extractFromFrontendConfig(): ElementorColor[] {
   const colors: ElementorColor[] = [];
   const config = getFrontendConfig();
-  if (!config) return colors;
+
+  // Try alternative data sources first if config is empty
+  if (!config) {
+    const altData = getElementorDataElements();
+    if (altData && altData.globals) {
+      const globals = altData.globals as Record<string, unknown>;
+      if (globals.colors && Array.isArray(globals.colors)) {
+        for (const c of globals.colors as Array<Record<string, unknown>>) {
+          if (c && typeof c === "object" && "_id" in c) {
+            colors.push({
+              _id: String(c._id),
+              title: String(c.title || c._id),
+              color: String(c.value || c.color || "#000000"),
+            });
+          }
+        }
+      }
+    }
+    return colors;
+  }
 
   try {
+    // Try config.config.kit.globals (Elementor Editor)
     const kit = (config as Record<string, unknown>).config;
-    if (typeof kit !== "object" || kit === null) return colors;
-    const kitObj = kit as Record<string, unknown>;
-    const globals = kitObj.globals;
-    if (typeof globals !== "object" || globals === null) return colors;
-    const globalsObj = globals as ElementorFrontendKitGlobals;
-    const colorList = globalsObj.colors;
-    if (!Array.isArray(colorList)) return colors;
+    if (typeof kit === "object" && kit !== null) {
+      const kitObj = kit as Record<string, unknown>;
+      const globals = kitObj.globals;
+      if (typeof globals === "object" && globals !== null) {
+        const globalsObj = globals as ElementorFrontendKitGlobals;
+        const colorList = globalsObj.colors;
+        if (Array.isArray(colorList)) {
+          for (const c of colorList) {
+            if (c && typeof c === "object" && "_id" in c && "value" in c) {
+              colors.push({
+                _id: c._id,
+                title: c.title || c._id,
+                color: c.value,
+              });
+            }
+          }
+        }
+      }
+    }
 
-    for (const c of colorList) {
-      if (c && typeof c === "object" && "_id" in c && "value" in c) {
-        colors.push({
-          _id: c._id,
-          title: c.title || c._id,
-          color: c.value,
-        });
+    // Also try settings.page.colors (Page-level colors)
+    if (colors.length === 0) {
+      const settings = config.settings as Record<string, unknown> | undefined;
+      if (settings && typeof settings === "object") {
+        const pageSettings = settings.page as Record<string, unknown> | undefined;
+        if (pageSettings && Array.isArray(pageSettings.color)) {
+          for (const c of pageSettings.color as Array<Record<string, unknown>>) {
+            if (c && typeof c === "object" && "_id" in c) {
+              colors.push({
+                _id: String(c._id),
+                title: String(c.title || c._id),
+                color: String(c.value || c.color || "#000000"),
+              });
+            }
+          }
+        }
       }
     }
   } catch {}
@@ -100,14 +163,17 @@ function extractFromCSSVariables(): ElementorColor[] {
 
 export async function extractColors(): Promise<ExtractorResult<ElementorColor[]>> {
   try {
-    const fromConfig = extractFromFrontendConfig();
+    // Priority: CSS variables are most reliable on frontend
     const fromCSS = extractFromCSSVariables();
+    const fromConfig = extractFromFrontendConfig();
 
     const merged = new Map<string, ElementorColor>();
+    // Prefer CSS variables, override with config if available
     for (const c of fromCSS) merged.set(c._id, c);
     for (const c of fromConfig) merged.set(c._id, c);
 
-    return { success: true, data: Array.from(merged.values()) };
+    const result = Array.from(merged.values());
+    return { success: true, data: result };
   } catch (error) {
     return { success: true, data: extractFromCSSVariables(), error: String(error) };
   }

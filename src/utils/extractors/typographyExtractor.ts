@@ -14,6 +14,19 @@ function getFrontendConfig(): Record<string, unknown> | null {
   return null;
 }
 
+function getElementorDataElements(): Record<string, unknown> | null {
+  try {
+    const dataEl = document.querySelector("[data-elementor-common-data]");
+    if (dataEl) {
+      const data = dataEl.getAttribute("data-elementor-common-data");
+      if (data) {
+        return JSON.parse(decodeURIComponent(data));
+      }
+    }
+  } catch {}
+  return null;
+}
+
 function parseTypography(raw: Record<string, unknown>): ElementorTypography {
   const getStr = (key: string): string => {
     const val = raw[key];
@@ -45,21 +58,53 @@ function parseTypography(raw: Record<string, unknown>): ElementorTypography {
 function extractFromFrontendConfig(): ElementorTypography[] {
   const typography: ElementorTypography[] = [];
   const config = getFrontendConfig();
-  if (!config) return typography;
+
+  // Try alternative data sources first if config is empty
+  if (!config) {
+    const altData = getElementorDataElements();
+    if (altData && altData.globals) {
+      const globals = altData.globals as Record<string, unknown>;
+      if (globals.typography && Array.isArray(globals.typography)) {
+        for (const t of globals.typography as Array<Record<string, unknown>>) {
+          if (typeof t === "object" && t !== null && "_id" in t) {
+            typography.push(parseTypography(t));
+          }
+        }
+      }
+    }
+    return typography;
+  }
 
   try {
     const kit = (config as Record<string, unknown>).config;
-    if (typeof kit !== "object" || kit === null) return typography;
-    const kitObj = kit as Record<string, unknown>;
-    const globals = kitObj.globals;
-    if (typeof globals !== "object" || globals === null) return typography;
-    const globalsObj = globals as ElementorFrontendKitGlobals;
-    const typoList = globalsObj.typography;
-    if (!Array.isArray(typoList)) return typography;
+    if (typeof kit === "object" && kit !== null) {
+      const kitObj = kit as Record<string, unknown>;
+      const globals = kitObj.globals;
+      if (typeof globals === "object" && globals !== null) {
+        const globalsObj = globals as ElementorFrontendKitGlobals;
+        const typoList = globalsObj.typography;
+        if (Array.isArray(typoList)) {
+          for (const t of typoList) {
+            if (typeof t === "object" && t !== null && "_id" in t) {
+              typography.push(parseTypography(t));
+            }
+          }
+        }
+      }
+    }
 
-    for (const t of typoList) {
-      if (typeof t === "object" && t !== null && "_id" in t) {
-        typography.push(parseTypography(t));
+    // Also try settings.page.typography
+    if (typography.length === 0) {
+      const settings = config.settings as Record<string, unknown> | undefined;
+      if (settings && typeof settings === "object") {
+        const pageSettings = settings.page as Record<string, unknown> | undefined;
+        if (pageSettings && Array.isArray(pageSettings.typography)) {
+          for (const t of pageSettings.typography as Array<Record<string, unknown>>) {
+            if (typeof t === "object" && t !== null && "_id" in t) {
+              typography.push(parseTypography(t));
+            }
+          }
+        }
       }
     }
   } catch {}
@@ -157,8 +202,9 @@ function extractFromCSSVariables(): ElementorTypography[] {
 
 export async function extractTypography(): Promise<ExtractorResult<ElementorTypography[]>> {
   try {
-    const fromConfig = extractFromFrontendConfig();
+    // Priority: CSS variables are most reliable on frontend
     const fromCSS = extractFromCSSVariables();
+    const fromConfig = extractFromFrontendConfig();
 
     const merged = new Map<string, ElementorTypography>();
     for (const t of fromCSS) merged.set(t._id, t);

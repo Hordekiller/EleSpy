@@ -450,3 +450,103 @@ export async function extractTemplates(): Promise<ExtractorResult<ElementorTempl
     return { success: true, data: [], error: String(error) };
   }
 }
+
+export interface PageSection {
+  id: string;
+  sectionType: DetectedSectionType;
+  title: string;
+  element: Record<string, unknown>;
+  rect?: { top: number; left: number; width: number; height: number };
+}
+
+function getAllSectionsFromDOM(): PageSection[] {
+  const sections: PageSection[] = [];
+
+  // Find all elementor sections, containers, and columns
+  const selectors = [
+    ".elementor-section",
+    ".elementor-container",
+    ".e-con",
+  ];
+
+  for (const selector of selectors) {
+    const elements = document.querySelectorAll(selector);
+    for (const el of Array.from(elements)) {
+      const htEl = el as HTMLElement;
+      const id = htEl.getAttribute("data-id") || "";
+      if (!id) continue;
+
+      const sectionType = detectSectionType(htEl);
+      const rect = htEl.getBoundingClientRect();
+
+      // Get title from settings or generate
+      let title = sectionType;
+      const dataSettings = htEl.getAttribute("data-settings");
+      if (dataSettings) {
+        try {
+          const settings = JSON.parse(dataSettings);
+          title = settings.section_title || settings._section_title || title;
+        } catch {}
+      }
+
+      sections.push({
+        id,
+        sectionType,
+        title: `${title} (#${id})`,
+        element: parseElementFromDOM(htEl) || {},
+        rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+      });
+    }
+  }
+
+  return sections;
+}
+
+export function getAllElementorSections(): PageSection[] {
+  // Try window data first
+  try {
+    const win = window as unknown as Record<string, unknown>;
+    const efc = win.elementorFrontendConfig as Record<string, unknown> | undefined;
+    if (efc && efc.elementsData && efc.elementsData.jsaps) {
+      // Already have window data, but need to map to sections
+    }
+  } catch {}
+
+  // Fall back to DOM
+  return getAllSectionsFromDOM();
+}
+
+export function extractSelectedSections(sectionIds: string[]): ElementorTemplate[] {
+  const templates: ElementorTemplate[] = [];
+
+  if (sectionIds.length === 0) {
+    // If no specific sections requested, extract all
+    const allSections = getAllElementorSections();
+    for (const section of allSections) {
+      templates.push({
+        id: section.id as unknown as number,
+        title: section.title,
+        type: section.sectionType,
+        content: JSON.stringify(section.element),
+        pageSettings: {},
+      });
+    }
+  } else {
+    // Extract specific sections by ID
+    for (const id of sectionIds) {
+      const el = document.querySelector(`[data-id="${id}"]`) as HTMLElement | null;
+      if (el) {
+        const sectionType = detectSectionType(el);
+        templates.push({
+          id: id as unknown as number,
+          title: `${sectionType} (#${id})`,
+          type: sectionType,
+          content: JSON.stringify(parseElementFromDOM(el) || {}),
+          pageSettings: {},
+        });
+      }
+    }
+  }
+
+  return templates;
+}

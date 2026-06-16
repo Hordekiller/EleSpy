@@ -269,6 +269,60 @@ function initEventListeners() {
       showNotification(t("notify.error"));
     }
   });
+
+  // Live section selection
+  document.getElementById("btn-detect-sections")?.addEventListener("click", async () => {
+    const sectionsListEl = document.getElementById("sections-list");
+    if (!sectionsListEl) return;
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+
+      await ensureContentScript(tab.id);
+      await new Promise((r) => setTimeout(r, 300));
+
+      const response = (await sendMessageToTab(tab.id, { type: "getSections" })) as {
+        success?: boolean;
+        data?: Array<{ id: string; sectionType: string; title: string; rect?: { top: number; width: number } }>;
+        error?: string;
+      } | null;
+
+      if (response?.success && response.data && response.data.length > 0) {
+        sectionsListEl.style.display = "block";
+        sectionsListEl.innerHTML = "";
+
+        // Group by section type
+        const headers = response.data.filter((s: { sectionType: string }) => s.sectionType === "header");
+        const footers = response.data.filter((s: { sectionType: string }) => s.sectionType === "footer");
+        const sections = response.data.filter((s: { sectionType: string }) => s.sectionType === "section");
+        const popups = response.data.filter((s: { sectionType: string }) => s.sectionType === "popup");
+
+        if (headers.length > 0) {
+          sectionsListEl.innerHTML += `<div class="section-group"><h4>هدرها</h4>${headers.map((s: { id: string; title: string }) => `<label class="section-item"><input type="checkbox" value="${s.id}"> ${s.title}</label>`).join("")}</div>`;
+        }
+        if (footers.length > 0) {
+          sectionsListEl.innerHTML += `<div class="section-group"><h4>فوترها</h4>${footers.map((s: { id: string; title: string }) => `<label class="section-item"><input type="checkbox" value="${s.id}"> ${s.title}</label>`).join("")}</div>`;
+        }
+        if (sections.length > 0) {
+          sectionsListEl.innerHTML += `<div class="section-group"><h4>بخش‌ها</h4>${sections.map((s: { id: string; title: string }) => `<label class="section-item"><input type="checkbox" value="${s.id}"> ${s.title}</label>`).join("")}</div>`;
+        }
+        if (popups.length > 0) {
+          sectionsListEl.innerHTML += `<div class="section-group"><h4>پاپ‌آپ‌ها</h4>${popups.map((s: { id: string; title: string }) => `<label class="section-item"><input type="checkbox" value="${s.id}"> ${s.title}</label>`).join("")}</div>`;
+        }
+
+        if (response.data.length === 0) {
+          sectionsListEl.innerHTML = `<p>${t("export.no-sections")}</p>`;
+        }
+
+        showNotification(t("notify.detected"));
+      } else {
+        showNotification(response?.error || t("notify.no-sections"));
+      }
+    } catch {
+      showNotification(t("notify.error"));
+    }
+  });
 }
 
 async function loadData() {
