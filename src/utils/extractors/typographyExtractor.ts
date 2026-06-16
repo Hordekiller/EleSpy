@@ -197,6 +197,56 @@ function extractFromCSSVariables(): ElementorTypography[] {
     });
   }
 
+  // If no global typography found, extract from used fonts in page
+  if (typography.length === 0) {
+    return extractFromDOMFonts();
+  }
+
+  return typography;
+}
+
+function extractFromDOMFonts(): ElementorTypography[] {
+  const typography: ElementorTypography[] = [];
+  const fontMap = new Map<string, { family: string; sizes: Set<number> }>();
+
+  // Scan all elements with computed styles
+  const elements = document.querySelectorAll("*");
+  const sampleSize = Math.min(elements.length, 100);
+
+  for (let i = 0; i < sampleSize; i++) {
+    try {
+      const el = elements[i] as HTMLElement;
+      const style = getComputedStyle(el);
+      const fontFamily = style.fontFamily?.replace(/['"]/g, "").trim();
+      const fontSize = parseInt(style.fontSize);
+
+      if (fontFamily && fontSize) {
+        if (!fontMap.has(fontFamily)) {
+          fontMap.set(fontFamily, { family: fontFamily, sizes: new Set() });
+        }
+        fontMap.get(fontFamily)!.sizes.add(fontSize);
+      }
+    } catch {}
+  }
+
+  let idx = 0;
+  for (const [family, data] of fontMap) {
+    const sizes = Array.from(data.sizes).sort((a, b) => b - a);
+    typography.push({
+      _id: `custom-${idx++}`,
+      title: family,
+      typography_typography: "custom",
+      typography_font_family: family,
+      typography_font_size: { unit: "px", size: sizes[0] || 16 },
+      typography_font_weight: "400",
+      typography_line_height: { unit: "em", size: 1.5 },
+      typography_letter_spacing: { unit: "px", size: 0 },
+      typography_font_style: "",
+      typography_text_decoration: "",
+      typography_text_transform: "",
+    });
+  }
+
   return typography;
 }
 

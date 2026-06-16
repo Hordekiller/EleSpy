@@ -1,5 +1,6 @@
 import { detectAllTechnologies } from "../detectors";
 import { extractFullKit } from "../utils/extractors/kitBuilder";
+import { getAllElementorSections, extractSelectedSections } from "../utils/extractors/templateExtractor";
 
 function generateId(): string {
   return Math.random().toString(16).substring(2, 10);

@@ -161,18 +161,49 @@ function extractFromCSSVariables(): ElementorColor[] {
   return colors;
 }
 
+function extractFromDOMColors(): ElementorColor[] {
+  const colors: ElementorColor[] = [];
+  const colorMap = new Map<string, string>();
+  const elements = document.querySelectorAll("*");
+
+  for (let i = 0; i < Math.min(elements.length, 50); i++) {
+    try {
+      const el = elements[i] as HTMLElement;
+      const style = getComputedStyle(el);
+      const bgColor = style.backgroundColor;
+      const textColor = style.color;
+
+      if (bgColor && bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent") {
+        colorMap.set(bgColor, bgColor);
+      }
+      if (textColor && textColor !== "rgba(0, 0, 0, 0)") {
+        colorMap.set(textColor, textColor);
+      }
+    } catch {}
+  }
+
+  let idx = 0;
+  for (const [color] of colorMap) {
+    colors.push({ _id: `dom-color-${idx++}`, title: `رنگ ${idx}`, color });
+  }
+
+  return colors;
+}
+
 export async function extractColors(): Promise<ExtractorResult<ElementorColor[]>> {
   try {
-    // Priority: CSS variables are most reliable on frontend
     const fromCSS = extractFromCSSVariables();
     const fromConfig = extractFromFrontendConfig();
 
     const merged = new Map<string, ElementorColor>();
-    // Prefer CSS variables, override with config if available
     for (const c of fromCSS) merged.set(c._id, c);
     for (const c of fromConfig) merged.set(c._id, c);
 
-    const result = Array.from(merged.values());
+    let result = Array.from(merged.values());
+    if (result.length === 0) {
+      result = extractFromDOMColors();
+    }
+
     return { success: true, data: result };
   } catch (error) {
     return { success: true, data: extractFromCSSVariables(), error: String(error) };
