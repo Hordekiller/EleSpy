@@ -6,11 +6,36 @@ interface ElementorFrontendKitGlobals {
 }
 
 function getFrontendConfig(): Record<string, unknown> | null {
-  try {
-    const win = window as unknown as Record<string, unknown>;
-    const efc = win.elementorFrontendConfig;
-    if (typeof efc === "object" && efc !== null) return efc as Record<string, unknown>;
-  } catch {}
+  // Try multiple ways to access Elementor config
+  const sources = [
+    () => (window as unknown as Record<string, unknown>).elementorFrontendConfig,
+    () => (window as unknown as Record<string, unknown>)["elementorFrontendConfig"],
+    () => {
+      const configEl = document.querySelector("#elementor-config, [data-elementor-config]") as HTMLElement | null;
+      if (configEl) {
+        try {
+          return JSON.parse(configEl.textContent || "");
+        } catch {}
+      }
+      return null;
+    },
+    () => {
+      const scripts = document.querySelectorAll('script[type*="elementor"]');
+      for (const script of Array.from(scripts)) {
+        try {
+          const data = JSON.parse(script.textContent || "");
+          if (data && typeof data === "object" && "config" in data) return data;
+        } catch {}
+      }
+      return null;
+    },
+  ];
+  for (const tryFn of sources) {
+    try {
+      const result = tryFn();
+      if (typeof result === "object" && result !== null) return result as Record<string, unknown>;
+    } catch {}
+  }
   return null;
 }
 
@@ -159,7 +184,7 @@ function extractFromCSSVariables(): ElementorTypography[] {
         const rules = Array.from(sheet.cssRules || []);
         for (const rule of rules) {
           if (!(rule instanceof CSSStyleRule)) continue;
-          if (rule.selectorText !== ":root" && rule.selectorText !== "html") continue;
+          // Search in all selectors
           for (let i = 0; i < rule.style.length; i++) {
             const prop = rule.style[i];
             if (prop.includes("--e-global-typography-")) {

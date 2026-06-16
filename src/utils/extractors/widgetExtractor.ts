@@ -126,10 +126,33 @@ function extractElementsFromDOM(parent: Element): ElementorWidget[] {
 function extractFromFrontendConfig(): ElementorWidget[] {
   const widgets: ElementorWidget[] = [];
 
+  // Try multiple ways to get Elementor config
+  let efc: Record<string, unknown> | null = null;
+  const sources = [
+    () => (window as unknown as Record<string, unknown>).elementorFrontendConfig,
+    () => (window as unknown as Record<string, unknown>)["elementorFrontendConfig"],
+    () => {
+      const configEl = document.querySelector("#elementor-config, [data-elementor-config]") as HTMLElement | null;
+      if (configEl) {
+        try {
+          return JSON.parse(configEl.textContent || "");
+        } catch {}
+      }
+      return null;
+    },
+  ];
+  for (const tryFn of sources) {
+    try {
+      const result = tryFn();
+      if (typeof result === "object" && result !== null) {
+        efc = result as Record<string, unknown>;
+        break;
+      }
+    } catch {}
+  }
+  if (!efc) return widgets;
+
   try {
-    const win = window as unknown as Record<string, unknown>;
-    const efc = win.elementorFrontendConfig;
-    if (typeof efc !== "object" || efc === null) return widgets;
 
     const config = efc as Record<string, unknown>;
     const elements = config.elements;

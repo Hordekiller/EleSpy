@@ -6,11 +6,40 @@ interface ElementorFrontendKitGlobals {
 }
 
 function getFrontendConfig(): Record<string, unknown> | null {
-  try {
-    const win = window as unknown as Record<string, unknown>;
-    const efc = win.elementorFrontendConfig;
-    if (typeof efc === "object" && efc !== null) return efc as Record<string, unknown>;
-  } catch {}
+  // Try multiple ways to access Elementor config
+  const sources = [
+    // window.elementorFrontendConfig
+    () => (window as unknown as Record<string, unknown>).elementorFrontendConfig,
+    // elementorFrontendConfig (global variable)
+    () => (window as unknown as Record<string, unknown>)["elementorFrontendConfig"],
+    // @elementor/config (custom element)
+    () => {
+      const configEl = document.querySelector("#elementor-config, [data-elementor-config]") as HTMLElement | null;
+      if (configEl) {
+        try {
+          return JSON.parse(configEl.textContent || "");
+        } catch {}
+      }
+      return null;
+    },
+    // Script tags with elementor config
+    () => {
+      const scripts = document.querySelectorAll('script[type*="elementor"]');
+      for (const script of Array.from(scripts)) {
+        try {
+          const data = JSON.parse(script.textContent || "");
+          if (data && typeof data === "object" && "config" in data) return data;
+        } catch {}
+      }
+      return null;
+    },
+  ];
+  for (const tryFn of sources) {
+    try {
+      const result = tryFn();
+      if (typeof result === "object" && result !== null) return result as Record<string, unknown>;
+    } catch {}
+  }
   return null;
 }
 
@@ -115,7 +144,7 @@ function extractFromCSSVariables(): ElementorColor[] {
       const rules = Array.from(sheet.cssRules || []);
       for (const rule of rules) {
         if (!(rule instanceof CSSStyleRule)) continue;
-        if (rule.selectorText !== ":root" && rule.selectorText !== "html") continue;
+        // Search in all selectors, not just :root
         for (let i = 0; i < rule.style.length; i++) {
           const prop = rule.style[i];
           const match = prop.match(/--e-global-color-([a-zA-Z_-]+)/);
@@ -163,27 +192,49 @@ function extractFromCSSVariables(): ElementorColor[] {
 
 function extractFromDOMColors(): ElementorColor[] {
   const colors: ElementorColor[] = [];
-  const colorMap = new Map<string, string>();
-  const elements = document.querySelectorAll("*");
+  const colorSet = new Set<string>();
 
-  for (let i = 0; i < Math.min(elements.length, 50); i++) {
+  // Collect from computed styles
+  const elements = document.querySelectorAll("*");
+  for (let i = 0; i < Math.min(elements.length, 100); i++) {
     try {
       const el = elements[i] as HTMLElement;
       const style = getComputedStyle(el);
       const bgColor = style.backgroundColor;
-      const textColor = style.color;
+      const color = style.color;
+      const borderColor = style.borderColor;
 
       if (bgColor && bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent") {
-        colorMap.set(bgColor, bgColor);
+        colorSet.add(bgColor);
       }
-      if (textColor && textColor !== "rgba(0, 0, 0, 0)") {
-        colorMap.set(textColor, textColor);
+      if (color && color !== "rgba(0, 0, 0, 0)") {
+        colorSet.add(color);
+      }
+      if (borderColor && borderColor !== "rgba(0, 0, 0, 0)") {
+        colorSet.add(borderColor);
       }
     } catch {}
   }
 
+  // Also collect from inline styles
+  for (const el of elements) {
+    try {
+      const style = el.getAttribute("style");
+      if (style) {
+        const matches = style.matchAll(/(?:color|background|border|outline)[-:]?\s*([^;]+)/gi);
+        for (const match of matches) {
+          const colorValue = match[1]?.trim();
+          if (colorValue && !colorValue.includes("var(") && !colorValue.includes("rgb") === false) {
+            colorSet.add(colorValue);
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // Add unique colors
   let idx = 0;
-  for (const [color] of colorMap) {
+  for (const color of colorSet) {
     colors.push({ _id: `dom-color-${idx++}`, title: `رنگ ${idx}`, color });
   }
 

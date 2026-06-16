@@ -31,7 +31,7 @@ export async function extractCSSVariables(): Promise<ExtractorResult<ElementorCS
       const rules = Array.from(sheet.cssRules || []);
       for (const rule of rules) {
         if (!(rule instanceof CSSStyleRule)) continue;
-        if (rule.selectorText !== ":root" && rule.selectorText !== "html") continue;
+        // Search in all selectors
         for (let i = 0; i < rule.style.length; i++) {
           const prop = rule.style[i];
           if (prop.startsWith("--e-")) {

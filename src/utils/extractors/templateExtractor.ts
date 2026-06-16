@@ -1,14 +1,37 @@
 import type { ElementorTemplate, ExtractorResult } from "../../types/elementor";
 
 function getWindowElementorData(): Record<string, unknown> | null {
-  try {
-    const win = window as unknown as Record<string, unknown>;
-    const efc = win.elementorFrontendConfig;
-    if (typeof efc !== "object" || efc === null) return null;
-    return efc as Record<string, unknown>;
-  } catch {
-    return null;
+  // Try multiple ways to access Elementor config
+  const sources = [
+    () => (window as unknown as Record<string, unknown>).elementorFrontendConfig,
+    () => (window as unknown as Record<string, unknown>)["elementorFrontendConfig"],
+    () => {
+      const configEl = document.querySelector("#elementor-config, [data-elementor-config]") as HTMLElement | null;
+      if (configEl) {
+        try {
+          return JSON.parse(configEl.textContent || "");
+        } catch {}
+      }
+      return null;
+    },
+    () => {
+      const scripts = document.querySelectorAll('script[type*="elementor"]');
+      for (const script of Array.from(scripts)) {
+        try {
+          const data = JSON.parse(script.textContent || "");
+          if (data && typeof data === "object" && "config" in data) return data;
+        } catch {}
+      }
+      return null;
+    },
+  ];
+  for (const tryFn of sources) {
+    try {
+      const result = tryFn();
+      if (typeof result === "object" && result !== null) return result as Record<string, unknown>;
+    } catch {}
   }
+  return null;
 }
 
 function parseWindowElementorElements(): Record<string, unknown>[] {

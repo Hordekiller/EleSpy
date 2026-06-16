@@ -30,6 +30,10 @@ async function runWithProgress<T>(
   progress: KitExtractionProgress[],
   callback?: ProgressCallback
 ): Promise<T> {
+  if (!Array.isArray(progress)) {
+    const result = await fn();
+    return result.data;
+  }
   const entry = progress.find((p) => p.step === step);
   if (entry) {
     entry.status = "running";
@@ -57,40 +61,44 @@ async function runWithProgress<T>(
 export async function extractFullKit(
   callback?: ProgressCallback
 ): Promise<ExtractorResult<FullKitResult>> {
-  const progress: KitExtractionProgress[] = [
-    { step: "colors", status: "pending" },
-    { step: "typography", status: "pending" },
-    { step: "cssVariables", status: "pending" },
-    { step: "siteSettings", status: "pending" },
-    { step: "widgets", status: "pending" },
-    { step: "templates", status: "pending" },
-    { step: "customCSS", status: "pending" },
-  ];
-
-  callback?.(progress);
-
+  // Simple direct extraction without complex progress tracking
   try {
-    const [colors, typography, cssVariables, siteSettings, widgets, templates, customCSS] =
-      await Promise.allSettled([
-        runWithProgress(extractColors, "colors", progress, callback),
-        runWithProgress(extractTypography, "typography", progress, callback),
-        runWithProgress(extractCSSVariables, "cssVariables", progress, callback),
-        runWithProgress(extractSiteSettings, "siteSettings", progress, callback),
-        runWithProgress(extractWidgets, "widgets", progress, callback),
-        runWithProgress(extractTemplates, "templates", progress, callback),
-        runWithProgress(extractCustomCSS, "customCSS", progress, callback),
+    // Run all extractors in parallel
+    const results = await Promise.all([
+      extractColors(),
+      extractTypography(),
+      extractCSSVariables(),
+      extractSiteSettings(),
+      extractWidgets(),
+      extractTemplates(),
+      extractCustomCSS(),
+    ]);
+
+    const [colors, typography, cssVariables, siteSettings, widgets, templates, customCSS] = results;
+
+    // Call callback if provided
+    if (callback) {
+      callback([
+        { step: "colors", status: "done", count: Array.isArray(colors.data) ? colors.data.length : 0 },
+        { step: "typography", status: "done", count: Array.isArray(typography.data) ? typography.data.length : 0 },
+        { step: "cssVariables", status: "done", count: Array.isArray(cssVariables.data) ? cssVariables.data.length : 0 },
+        { step: "siteSettings", status: "done" },
+        { step: "widgets", status: "done", count: Array.isArray(widgets.data) ? widgets.data.length : 0 },
+        { step: "templates", status: "done", count: Array.isArray(templates.data) ? templates.data.length : 0 },
+        { step: "customCSS", status: "done", count: customCSS.data ? 1 : 0 },
       ]);
+    }
 
     return {
       success: true,
       data: {
-        globalColors: colors.status === "fulfilled" ? colors.value : [],
-        globalTypography: typography.status === "fulfilled" ? typography.value : [],
-        cssVariables: cssVariables.status === "fulfilled" ? cssVariables.value : [],
-        siteSettings: siteSettings.status === "fulfilled" ? siteSettings.value : {},
-        widgets: widgets.status === "fulfilled" ? widgets.value : [],
-        templates: templates.status === "fulfilled" ? templates.value : [],
-        customCSS: customCSS.status === "fulfilled" ? customCSS.value : "",
+        globalColors: colors.data || [],
+        globalTypography: typography.data || [],
+        cssVariables: cssVariables.data || [],
+        siteSettings: siteSettings.data || {},
+        widgets: widgets.data || [],
+        templates: templates.data || [],
+        customCSS: customCSS.data || "",
       },
     };
   } catch (error) {
