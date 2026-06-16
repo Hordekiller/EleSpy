@@ -500,7 +500,14 @@ function extractAllStyles() {
     }
   });
 
-  const sheets = Array.from(document.styleSheets);
+  let sheets: CSSStyleSheet[] = [];
+  try {
+    sheets = Array.from(document.styleSheets);
+  } catch (e) {
+    // Cross-origin stylesheets may not be accessible
+    console.log("[EleSpy] Could not access document.styleSheets:", e);
+  }
+
   for (const sheet of sheets) {
     try {
       const rules = Array.from(sheet.cssRules || []);
@@ -584,6 +591,267 @@ function extractAllStyles() {
     generatedCSS: generatedCSSLines.join("\n"),
     rawCSS: inlineStyles.join("\n\n"),
   };
+}
+
+// Live section selection - create and inject tooltip
+function createSelectionTooltip(): void {
+  // Remove existing if any
+  const existing = document.getElementById("elespy-selection-tooltip");
+  if (existing) existing.remove();
+
+  const tooltip = document.createElement("div");
+  tooltip.id = "elespy-selection-tooltip";
+  Object.assign(tooltip.style, {
+    position: "fixed",
+    zIndex: "999999",
+    background: "#1a1a1a",
+    color: "#fff",
+    padding: "12px 16px",
+    borderRadius: "8px",
+    fontSize: "13px",
+    fontFamily: "system-ui, sans-serif",
+    maxWidth: "300px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+    display: "none",
+    pointerEvents: "auto",
+    cursor: "pointer",
+  });
+
+  // Copy button
+  const copyBtn = document.createElement("button");
+  Object.assign(copyBtn.style, {
+    background: "#6366f1",
+    color: "#fff",
+    border: "none",
+    padding: "8px 16px",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: "600",
+    marginTop: "8px",
+    width: "100%",
+  });
+  copyBtn.textContent = "Copy Section";
+
+  // Paste button
+  const pasteBtn = document.createElement("button");
+  Object.assign(pasteBtn.style, {
+    background: "#22c55e",
+    color: "#fff",
+    border: "none",
+    padding: "8px 16px",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: "600",
+    marginTop: "8px",
+    width: "100%",
+  });
+  pasteBtn.textContent = "Paste to Elementor";
+
+  tooltip.appendChild(copyBtn);
+  tooltip.appendChild(pasteBtn);
+  document.body.appendChild(tooltip);
+
+  let currentSection: PageSection | null = null;
+
+  // Store ref for access
+  (window as unknown as { _elespyTooltip?: { tooltip: HTMLElement; copyBtn: HTMLElement; pasteBtn: HTMLElement; section: PageSection | null } })._elespyTooltip = {
+    tooltip: tooltip as HTMLElement,
+    copyBtn: copyBtn as HTMLElement,
+    pasteBtn: pasteBtn as HTMLElement,
+    get section() { return currentSection; },
+    set section(v) { currentSection = v; },
+  };
+
+  // Copy click handler
+  copyBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (currentSection) {
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(currentSection.element, null, 2));
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => { copyBtn.textContent = "Copy Section"; }, 1500);
+      } catch { copyBtn.textContent = "Copy Failed"; }
+    }
+  });
+
+  // Paste click handler - trigger Elementor paste
+  pasteBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (currentSection) {
+      // Dispatch custom event that Elementor can listen for
+      const event = new CustomEvent("elespy:paste-section", {
+        detail: { section: currentSection.element },
+        bubbles: true,
+      });
+      document.dispatchEvent(event);
+
+      // Try to paste to clipboard for manual paste
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(currentSection.element, null, 2));
+        pasteBtn.textContent = "Copied! Ready to paste";
+        setTimeout(() => { pasteBtn.textContent = "Paste to Elementor"; }, 2000);
+      } catch {}
+    }
+  });
+
+  // Hide on outside click
+  document.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (!tooltip.contains(target)) {
+      tooltip.style.display = "none";
+    }
+  });
+
+  // Track current section and element
+  (window as unknown as { _elespyCurrentSection?: PageSection | null })._elespyCurrentSection = null;
+}
+
+// Get current section info
+interface PageSection {
+  id: string;
+  sectionType: string;
+  title: string;
+  element: Record<string, unknown>;
+  rect?: { top: number; left: number; width: number; height: number };
+}
+
+// Live hover handler
+function initLiveSelection(): void {
+  createSelectionTooltip();
+
+  const tooltip = document.getElementById("elespy-selection-tooltip") as HTMLElement | null;
+  if (!tooltip) return;
+
+  let hoveredElement: HTMLElement | null = null;
+  let highlightEl: HTMLElement | null = null;
+
+  function cleanup() {
+    if (highlightEl) {
+      highlightEl.style.outline = "";
+      highlightEl = null;
+    }
+  }
+
+  function showTooltip(x: number, y: number, section: PageSection) {
+    const tooltipWidth = 200;
+    const tooltipHeight = 120;
+
+    // Position next to cursor, avoid overflow
+    let left = x + 15;
+    let top = y + 15;
+
+    if (left + tooltipWidth > window.innerWidth - 20) {
+      left = x - tooltipWidth - 15;
+    }
+    if (top + tooltipHeight > window.innerHeight - 20) {
+      top = y - tooltipHeight - 15;
+    }
+
+    // Update content
+    const info = document.createElement("div");
+    info.innerHTML = `
+      <div style="margin-bottom:8px;font-weight:600;color:#a5b4fc;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">${section.sectionType}</div>
+      <div style="font-weight:500;margin-bottom:4px;">${section.title || section.id}</div>
+      <div style="color:#9ca3af;font-size:11px;">ID: ${section.id}</div>
+    `;
+
+    // Insert before buttons
+    const copyBtn = tooltip.querySelector("button:first-child")!;
+    const pasteBtn = tooltip.querySelector("button:last-child")!;
+    tooltip.insertBefore(info, copyBtn);
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.style.display = "block";
+
+    // Store current section
+    (window as unknown as { _elespyCurrentSection?: PageSection | null })._elespyCurrentSection = section;
+  }
+
+  function hideTooltip() {
+    tooltip.style.display = "none";
+  }
+
+  function getHoveredSection(target: HTMLElement): PageSection | null {
+    // Find closest elementor element
+    let el: HTMLElement | null = target.closest(".elementor-section, .elementor-container, .e-con, .elementor-column") as HTMLElement | null;
+
+    if (!el) return null;
+
+    const id = el.getAttribute("data-id");
+    if (!id) return null;
+
+    const rect = el.getBoundingClientRect();
+    const sectionType = el.classList.contains("elementor-section") ? "section" :
+      el.classList.contains("e-con") ? "container" :
+        el.classList.contains("elementor-column") ? "column" : "element";
+
+    const dataSettings = el.getAttribute("data-settings");
+    let title = sectionType;
+    try {
+      if (dataSettings) {
+        const settings = JSON.parse(dataSettings);
+        title = settings.section_title || settings._section_title || title;
+      }
+    } catch {}
+
+    // Get element content structure
+    const element: Record<string, unknown> = { id, elType: sectionType };
+
+    // Add widget info
+    const widgets = el.querySelectorAll(":scope > .elementor-widget");
+    if (widgets.length > 0) {
+      (element as { widgets?: string[] }).widgets = Array.from(widgets).map(w =>
+        w.getAttribute("data-widget_type")?.split(".")[0] || "unknown"
+      ).filter(Boolean);
+    }
+
+    return {
+      id,
+      sectionType,
+      title,
+      element,
+      rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+    };
+  }
+
+  function highlightSection(el: HTMLElement) {
+    cleanup();
+    if (!el) return;
+    highlightEl = el;
+    el.style.outline = "2px solid #6366f1";
+    el.style.outlineOffset = "-2px";
+  }
+
+  // Mouse move - track hover
+  document.addEventListener("mousemove", (e) => {
+    const target = e.target as HTMLElement;
+    const section = getHoveredSection(target);
+
+    if (section) {
+      if (hoveredElement !== target) {
+        hoveredElement = target;
+        highlightSection(section.element as unknown as HTMLElement);
+      }
+      showTooltip(e.clientX, e.clientY, section);
+    } else {
+      cleanup();
+      hoveredElement = null;
+      hideTooltip();
+    }
+  }, { passive: true });
+
+  // Click - show more info and keep open
+  document.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    const section = getHoveredSection(target);
+
+    if (section && tooltip.style.display === "none") {
+      showTooltip(e.clientX, e.clientY, section);
+    }
+  }, { passive: true });
 }
 
 export default defineContentScript({
@@ -673,11 +941,14 @@ export default defineContentScript({
         }
 
         if (request.type === "extract:full-kit") {
+          console.log("[EleSpy] Starting full kit extraction...");
           extractFullKit()
             .then((result) => {
+              console.log("[EleSpy] Extraction result:", result);
               sendResponse({ success: true, data: result });
             })
             .catch((err) => {
+              console.log("[EleSpy] Extraction error:", err);
               sendResponse({ success: false, error: String(err) });
             });
           return true;
@@ -695,6 +966,31 @@ export default defineContentScript({
           const sectionIds = request.sectionIds as string[] | undefined;
           const sections = extractSelectedSections(sectionIds || []);
           sendResponse({ success: true, data: sections });
+          return true;
+        }
+
+        // Start live section selection mode
+        if (request.type === "startLiveSelection") {
+          try {
+            initLiveSelection();
+            sendResponse({ success: true });
+          } catch (err) {
+            sendResponse({ success: false, error: String(err) });
+          }
+          return true;
+        }
+
+        // Stop live selection
+        if (request.type === "stopLiveSelection") {
+          try {
+            const tooltip = document.getElementById("elespy-selection-tooltip");
+            if (tooltip) tooltip.remove();
+            const highlight = document.querySelectorAll("[style*='outline: 2px solid #6366f1']");
+            highlight.forEach(el => { (el as HTMLElement).style.outline = ""; });
+            sendResponse({ success: true });
+          } catch (err) {
+            sendResponse({ success: false, error: String(err) });
+          }
           return true;
         }
 

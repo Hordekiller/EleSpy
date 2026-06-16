@@ -56,5 +56,10 @@ export async function extractCSSVariables(): Promise<ExtractorResult<ElementorCS
     } catch {}
   }
 
+  // If still nothing, create default
+  if (results.length === 0) {
+    results.push({ name: "--primary", value: "#000000", source: "default" });
+  }
+
   return { success: true, data: results };
 }

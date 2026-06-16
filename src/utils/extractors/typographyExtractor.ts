@@ -290,9 +290,13 @@ export async function extractTypography(): Promise<ExtractorResult<ElementorTypo
     if (result.length === 0) {
       result = extractFromDOMFonts();
     }
+    // If still nothing, create default
+    if (result.length === 0) {
+      result = [{ _id: "default", title: "Default", typography_typography: "custom", typography_font_family: "Arial", typography_font_size: { unit: "px", size: 16 }, typography_font_weight: "400", typography_line_height: { unit: "em", size: 1.5 }, typography_letter_spacing: { unit: "px", size: 0 }, typography_font_style: "", typography_text_decoration: "", typography_text_transform: "" }];
+    }
 
     return { success: true, data: result };
   } catch (error) {
-    return { success: true, data: extractFromDOMFonts(), error: String(error) };
+    return { success: true, data: [{ _id: "default", title: "Default", typography_typography: "custom", typography_font_family: "Arial", typography_font_size: { unit: "px", size: 16 }, typography_font_weight: "400", typography_line_height: { unit: "em", size: 1.5 }, typography_letter_spacing: { unit: "px", size: 0 }, typography_font_style: "", typography_text_decoration: "", typography_text_transform: "" }], error: String(error) };
   }
 }

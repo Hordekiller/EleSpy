@@ -247,30 +247,76 @@ function initEventListeners() {
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) return;
+      if (!tab?.id) {
+        console.log("[EleSpy] No tab found");
+        return;
+      }
 
+      console.log("[EleSpy] Ensuring content script is loaded...");
       await ensureContentScript(tab.id);
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 500));
 
+      console.log("[EleSpy] Sending extraction request...");
       const response = (await sendMessageToTab(tab.id, { type: "extract:full-kit" })) as {
         success?: boolean;
         data?: FullKitResult;
         error?: string;
       } | null;
 
+      console.log("[EleSpy] Response:", response);
+
       if (response?.success && response.data) {
         fullKitData = response.data;
+        console.log("[EleSpy] Full kit data:", fullKitData);
         showNotification(t("notify.extracted"));
         updateFullExportUI(fullKitData);
       } else {
+        console.log("[EleSpy] Response error:", response?.error);
         showNotification(response?.error || t("notify.error"));
       }
-    } catch {
+    } catch (err) {
+      console.log("[EleSpy] Catch error:", err);
       showNotification(t("notify.error"));
     }
   });
 
-  // Live section selection
+  // Start live selection mode - triggers hover/paste functionality
+  document.getElementById("btn-live-selection")?.addEventListener("click", async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+
+      await ensureContentScript(tab.id);
+
+      const response = (await sendMessageToTab(tab.id, { type: "startLiveSelection" })) as {
+        success?: boolean;
+        error?: string;
+      } | null;
+
+      if (response?.success) {
+        showNotification(t("notify.live-selection-active") || "انتخاب زنده فعال شد!");
+      } else {
+        showNotification(response?.error || t("notify.error"));
+      }
+    } catch (err) {
+      console.log("[EleSpy] Live selection error:", err);
+      showNotification(t("notify.error"));
+    }
+  });
+
+  // Stop live selection mode
+  document.getElementById("btn-live-selection")?.addEventListener("contextmenu", async (e) => {
+    e.preventDefault();
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+
+      await sendMessageToTab(tab.id, { type: "stopLiveSelection" });
+      showNotification(t("notify.live-selection-stopped") || "انتخاب زنده متوقف شد!");
+    } catch {}
+  });
+
+  // Auto-detect sections (existing functionality)
   document.getElementById("btn-detect-sections")?.addEventListener("click", async () => {
     const sectionsListEl = document.getElementById("sections-list");
     if (!sectionsListEl) return;
