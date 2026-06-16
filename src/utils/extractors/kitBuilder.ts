@@ -179,35 +179,48 @@ export function buildKitJSON(result: FullKitResult): Record<string, unknown> {
   const colors = mapColorsToKit(result.globalColors);
   const typo = mapTypographyToKit(result.globalTypography);
 
-  const content = result.templates.map((t, index) => ({
-    id: index + 1,
-    title: t.title,
-    type: t.type,
-    status: "publish",
-    content: t.content,
-    "export_link_element_data": {},
-  }));
+  // Build proper Elementor Kit format - content must be JSON string
+  const content = result.templates.map((t, index) => {
+    // Ensure content is a valid JSON string that Elementor expects
+    let contentStr: string;
+    try {
+      // If it's already a string, use it; otherwise stringify
+      contentStr = typeof t.content === "string" ? t.content : JSON.stringify(t.content);
+    } catch {
+      contentStr = "[]";
+    }
+
+    return {
+      id: index + 1,
+      title: t.title,
+      type: t.type,
+      status: "publish",
+      content: contentStr,
+      "export_link_element_data": {},
+    };
+  });
 
   return {
     version: "1.0",
-    title: `EleSpy Export — ${window.location.hostname}`,
+    title: `EleSpy Export — ${typeof window !== "undefined" ? window.location.hostname : "site"}`,
     plugins: [
       { name: "Elementor", slug: "elementor", version: "3.x.x" },
     ],
     "site-settings": {
-      settings: result.siteSettings,
+      settings: {
+        ...result.siteSettings,
+        // Include design tokens at proper locations for Elementor kit
+        system_colors: colors.system_colors,
+        custom_colors: colors.custom_colors,
+        system_typography: typo.system_typography,
+        custom_typography: typo.custom_typography,
+      },
     },
     content,
     "wp-content": {
       templates: result.templates,
       taxonomies: {},
       "wp-pages": [],
-    },
-    _design_system: {
-      colors: colors,
-      typography: typo,
-      css_variables: result.cssVariables.map((v) => `${v.name}: ${v.value};`),
-      custom_css: result.customCSS,
     },
   };
 }
