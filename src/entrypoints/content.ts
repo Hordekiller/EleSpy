@@ -1,6 +1,63 @@
 import { detectAllTechnologies } from "../detectors";
 import { extractFullKit } from "../utils/extractors/kitBuilder";
 import { getAllElementorSections, extractSelectedSections } from "../utils/extractors/templateExtractor";
+import { getPageExtractorScript } from "../utils/inject/pageExtractor";
+
+// Helper: Extract CSS variables from DOM in content script context
+function extractCSSVariablesFromDOM(): Record<string, string> {
+  const variables: Record<string, string> = {};
+  try {
+    const rootStyles = getComputedStyle(document.documentElement);
+    for (let i = 0; i < rootStyles.length; i++) {
+      const prop = rootStyles[i];
+      if (prop.startsWith("--e-")) {
+        variables[prop] = rootStyles.getPropertyValue(prop).trim();
+      }
+    }
+  } catch (e) {
+    console.log("[EleSpy] Could not read CSS variables:", e);
+  }
+  return variables;
+}
+
+// Helper: Extract DOM element data in content script context
+function extractDOMElementsFromDOM(): Array<Record<string, unknown>> {
+  const elements: Array<Record<string, unknown>> = [];
+  try {
+    const els = document.querySelectorAll('.elementor-element[data-id]');
+    for (const el of Array.from(els)) {
+      const htEl = el as HTMLElement;
+      const id = htEl.getAttribute("data-id");
+      if (!id) continue;
+
+      const elementType = htEl.getAttribute("data-element_type");
+      const widgetType = htEl.getAttribute("data-widget_type");
+      const settingsRaw = htEl.getAttribute("data-settings");
+
+      let settings = {};
+      if (settingsRaw) {
+        try {
+          // Decode HTML entities
+          const decoded = settingsRaw
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&amp;/g, '&');
+          settings = JSON.parse(decoded);
+        } catch { /* malformed - skip */ }
+      }
+
+      elements.push({
+        id,
+        elementType,
+        widgetType,
+        settings,
+      });
+    }
+  } catch (e) {
+    console.log("[EleSpy] Could not extract DOM elements:", e);
+  }
+  return elements;
+}
 
 function generateId(): string {
   return Math.random().toString(16).substring(2, 10);
@@ -946,6 +1003,66 @@ export default defineContentScript({
             .then((result) => {
               console.log("[EleSpy] Extraction result:", result);
               sendResponse({ success: true, data: result });
+            })
+            .catch((err) => {
+              console.log("[EleSpy] Extraction error:", err);
+              sendResponse({ success: false, error: String(err) });
+            });
+          return true;
+        }
+
+        // Extract elementor data using injected script - CORRECT architecture
+        if (request.type === "extract:elementor") {
+          console.log("[EleSpy] Starting extracted elementor data...");
+
+          // Step 1: Create a promise that resolves when we get the data from injected script
+          const extractionPromise = new Promise((resolve) => {
+            // Handler for message from injected script
+            const handler = (event: MessageEvent) => {
+              if (event.source !== window) return;
+              if (!event.data || event.data.type !== "ELESPY_DATA") return;
+
+              // Clean up listener
+              window.removeEventListener("message", handler);
+
+              if (!event.data.success) {
+                resolve({ success: false, error: event.data.error || "Extraction failed" });
+                return;
+              }
+
+              // Got data from page's window - now combine with CSS variables and DOM data
+              resolve({
+                success: true,
+                data: {
+                  ...event.data.payload,
+                  // CSS variables from content script context
+                  cssVariables: extractCSSVariablesFromDOM(),
+                  // DOM elements from content script context
+                  domElements: extractDOMElementsFromDOM(),
+                }
+              });
+            };
+
+            // Step 2: Listen for the response
+            window.addEventListener("message", handler);
+
+            // Step 3: Inject the script into the page
+            const script = document.createElement("script");
+            script.textContent = getPageExtractorScript();
+            (document.head || document.documentElement).appendChild(script);
+            script.remove();
+
+            // Step 4: Timeout safety - 5 seconds
+            setTimeout(() => {
+              window.removeEventListener("message", handler);
+              resolve({ success: false, error: "Extraction timed out" });
+            }, 5000);
+          });
+
+          extractionPromise
+            .then((result) => {
+              console.log("[EleSpy] Extracted elementor data:", result);
+              sendResponse(result);
             })
             .catch((err) => {
               console.log("[EleSpy] Extraction error:", err);
