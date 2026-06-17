@@ -58,7 +58,7 @@ async function ensureContentScript(tabId: number): Promise<boolean> {
 }
 
 async function loadSettings() {
-  const data = await chrome.storage.local.get(["elespy:settings"]);
+  const data = await chrome.storage.local.get(["elespy:settings"]) as { "elespy:settings"?: { lang: string; theme: string; autoCopy: boolean } };
   const settings = data["elespy:settings"] || {
     lang: "fa",
     theme: "light",
@@ -74,7 +74,7 @@ async function loadSettings() {
 }
 
 async function saveSettings(key: string, value: unknown) {
-  const data = await chrome.storage.local.get(["elespy:settings"]);
+  const data = await chrome.storage.local.get(["elespy:settings"]) as { "elespy:settings"?: Record<string, unknown> };
   const settings = data["elespy:settings"] || {};
   settings[key] = value;
   await chrome.storage.local.set({ "elespy:settings": settings });

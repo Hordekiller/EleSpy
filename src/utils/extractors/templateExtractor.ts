@@ -530,8 +530,11 @@ export function getAllElementorSections(): PageSection[] {
   try {
     const win = window as unknown as Record<string, unknown>;
     const efc = win.elementorFrontendConfig as Record<string, unknown> | undefined;
-    if (efc && efc.elementsData && efc.elementsData.jsaps) {
-      // Already have window data, but need to map to sections
+    if (efc && efc.elementsData) {
+      const elementsData = efc.elementsData as Record<string, unknown>;
+      if (elementsData.jsaps) {
+        // Already have window data, but need to map to sections
+      }
     }
   } catch {}
 

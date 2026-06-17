@@ -815,20 +815,23 @@ function initLiveSelection(): void {
     `;
 
     // Insert before buttons
+    if (!tooltip) return;
     const copyBtn = tooltip.querySelector("button:first-child")!;
     const pasteBtn = tooltip.querySelector("button:last-child")!;
-    tooltip.insertBefore(info, copyBtn);
+    if (copyBtn && pasteBtn) {
+      tooltip.insertBefore(info, copyBtn);
 
-    tooltip.style.left = `${left}px`;
-    tooltip.style.top = `${top}px`;
-    tooltip.style.display = "block";
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.display = "block";
+    }
 
     // Store current section
     (window as unknown as { _elespyCurrentSection?: PageSection | null })._elespyCurrentSection = section;
   }
 
   function hideTooltip() {
-    tooltip.style.display = "none";
+    if (tooltip) tooltip.style.display = "none";
   }
 
   function getHoveredSection(target: HTMLElement): PageSection | null {
@@ -944,8 +947,8 @@ export default defineContentScript({
 
     chrome.runtime.onMessage.addListener(
       (
-        request: { type: string; format?: string },
-        _sender,
+        request: { type: string; format?: string; sectionIds?: string[] },
+        _sender: chrome.runtime.MessageSender,
         sendResponse: (response: unknown) => void
       ) => {
         if (request.type === "detect") {
