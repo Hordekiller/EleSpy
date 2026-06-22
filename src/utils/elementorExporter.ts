@@ -1,4 +1,5 @@
 import type { ExtractedStyles } from "../types/elementor";
+import { normalizeElementorTemplate, type ElementorImportTemplate } from "./elementorTemplateNormalizer";
 
 interface ElementorKitExport {
   version: string;
@@ -13,18 +14,18 @@ interface ElementorKitExport {
   };
 }
 
-export function generateTemplateExport(styles: ExtractedStyles): Record<string, unknown> {
+export function generateTemplateExport(styles: ExtractedStyles): ElementorImportTemplate {
   if (styles.template && (styles.template as Record<string, unknown>).content) {
-    return styles.template as Record<string, unknown>;
+    return normalizeElementorTemplate(styles.template);
   }
 
-  return {
+  return normalizeElementorTemplate({
     title: "EleSpy Extracted Template",
     type: "page",
     version: "0.4",
     page_settings: [],
     content: [],
-  };
+  });
 }
 
 export function generateKitExport(styles: ExtractedStyles): ElementorKitExport {

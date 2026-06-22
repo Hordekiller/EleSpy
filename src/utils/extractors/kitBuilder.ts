@@ -14,6 +14,7 @@ import { extractSiteSettings } from "./siteSettingsExtractor";
 import { extractWidgets } from "./widgetExtractor";
 import { extractTemplates } from "./templateExtractor";
 import { extractCustomCSS } from "./customCSSExtractor";
+import { normalizeElementorTemplate, stringifyElementorContent } from "../elementorTemplateNormalizer";
 
 export interface KitExtractionProgress {
   step: string;
@@ -189,21 +190,19 @@ export function buildKitJSON(result: FullKitResult): Record<string, unknown> {
 
   // Build proper Elementor Kit format - content must be JSON string
   const content = result.templates.map((t, index) => {
-    // Ensure content is a valid JSON string that Elementor expects
-    let contentStr: string;
-    try {
-      // If it's already a string, use it; otherwise stringify
-      contentStr = typeof t.content === "string" ? t.content : JSON.stringify(t.content);
-    } catch {
-      contentStr = "[]";
-    }
+    const normalizedTemplate = normalizeElementorTemplate({
+      title: t.title,
+      type: t.type,
+      pageSettings: t.pageSettings,
+      content: t.content,
+    });
 
     return {
       id: index + 1,
-      title: t.title,
-      type: t.type,
+      title: normalizedTemplate.title,
+      type: normalizedTemplate.type,
       status: "publish",
-      content: contentStr,
+      content: stringifyElementorContent(normalizedTemplate.content),
       "export_link_element_data": {},
     };
   });
@@ -226,7 +225,22 @@ export function buildKitJSON(result: FullKitResult): Record<string, unknown> {
     },
     content,
     "wp-content": {
-      templates: result.templates,
+      templates: result.templates.map((template) => {
+        const normalized = normalizeElementorTemplate({
+          title: template.title,
+          type: template.type,
+          pageSettings: template.pageSettings,
+          content: template.content,
+        });
+
+        return {
+          ...template,
+          title: normalized.title,
+          type: normalized.type as typeof template.type,
+          content: stringifyElementorContent(normalized.content),
+          pageSettings: normalized.page_settings as Record<string, unknown>,
+        };
+      }),
       taxonomies: {},
       "wp-pages": [],
     },

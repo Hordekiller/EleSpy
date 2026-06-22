@@ -1,4 +1,5 @@
 import type { ElementorTemplate, ExtractorResult } from "../../types/elementor";
+import { normalizeElementorTemplate, stringifyElementorContent } from "../elementorTemplateNormalizer";
 
 function getWindowElementorData(): Record<string, unknown> | null {
   // Try multiple ways to access Elementor config
@@ -104,13 +105,174 @@ function decodeHtmlEntities(text: string): string {
   return doc.body.textContent || text;
 }
 
+function parseSettingsAttribute(el: HTMLElement): Record<string, unknown> {
+  const dataSettings = el.getAttribute("data-settings");
+  if (!dataSettings) return {};
+
+  try {
+    return JSON.parse(decodeHtmlEntities(dataSettings));
+  } catch {
+    try {
+      return JSON.parse(dataSettings);
+    } catch {
+      return {};
+    }
+  }
+}
+
+function cleanHtml(html: string): string {
+  const template = document.createElement("template");
+  template.innerHTML = html || "";
+  template.content.querySelectorAll("script, noscript, style, link, meta").forEach((el) => el.remove());
+  return template.innerHTML.trim();
+}
+
+function getWidgetContainer(el: HTMLElement): HTMLElement {
+  return (
+    (el.querySelector(":scope > .elementor-widget-container") as HTMLElement | null) ||
+    (el.querySelector(".elementor-widget-container") as HTMLElement | null) ||
+    el
+  );
+}
+
+function isImportableDomElement(el: Element): boolean {
+  const htEl = el as HTMLElement;
+  const classes = htEl.className || "";
+
+  return (
+    classes.includes("elementor-section") ||
+    classes.includes("elementor-column") ||
+    classes.includes("elementor-widget") ||
+    classes.includes("e-con") ||
+    htEl.hasAttribute("data-element_type") ||
+    htEl.hasAttribute("data-widget_type")
+  );
+}
+
+function getDirectElementorChildren(root: Element): HTMLElement[] {
+  const found: HTMLElement[] = [];
+
+  const visit = (parent: Element) => {
+    Array.from(parent.children).forEach((child) => {
+      if (isImportableDomElement(child)) {
+        found.push(child as HTMLElement);
+      } else {
+        visit(child);
+      }
+    });
+  };
+
+  visit(root);
+  return Array.from(new Set(found));
+}
+
+function extractWidgetSettingsFromDOM(el: HTMLElement, widgetType: string): Record<string, unknown> {
+  const settings = parseSettingsAttribute(el);
+  const container = getWidgetContainer(el);
+  const html = cleanHtml(container.innerHTML);
+
+  switch (widgetType) {
+    case "heading": {
+      const heading = container.querySelector("h1, h2, h3, h4, h5, h6");
+      if (heading) {
+        settings.title = heading.textContent?.trim() || "";
+        settings.header_size = heading.tagName.toLowerCase();
+      }
+      break;
+    }
+    case "text-editor":
+    case "editor":
+      settings.editor = html;
+      break;
+    case "button": {
+      const button = container.querySelector("a.elementor-button, .elementor-button, a[href]");
+      settings.text = button?.textContent?.trim() || el.textContent?.trim() || "Click Here";
+      const href = button?.getAttribute("href");
+      if (href) {
+        settings.link = {
+          url: href,
+          is_external: button?.getAttribute("target") === "_blank",
+          nofollow: (button?.getAttribute("rel") || "").split(/\s+/).includes("nofollow"),
+        };
+      }
+      break;
+    }
+    case "image": {
+      const image = container.querySelector("img");
+      if (image) {
+        settings.image = {
+          url: (image as HTMLImageElement).currentSrc || image.getAttribute("src") || "",
+          id: "",
+          size: "",
+          alt: image.getAttribute("alt") || "",
+          source: "library",
+        };
+        settings.image_size = "full";
+      }
+      break;
+    }
+    case "video": {
+      const media = container.querySelector("iframe, video, embed") as HTMLIFrameElement | HTMLVideoElement | null;
+      const source = media?.getAttribute("src") || ("currentSrc" in (media || {}) ? (media as HTMLVideoElement).currentSrc : "");
+      if (source?.includes("youtube")) {
+        settings.video_type = "youtube";
+        settings.youtube_url = source;
+      } else if (source?.includes("vimeo")) {
+        settings.video_type = "vimeo";
+        settings.vimeo_url = source;
+      } else if (source) {
+        settings.video_type = "hosted";
+        settings.hosted_url = { url: source };
+      }
+      break;
+    }
+    case "tabs":
+    case "accordion":
+    case "toggle": {
+      const titles = Array.from(container.querySelectorAll(".elementor-tab-title"));
+      const contents = Array.from(container.querySelectorAll(".elementor-tab-content"));
+      if (titles.length) {
+        settings.tabs = titles.map((title, index) => ({
+          tab_title: title.textContent?.trim() || `Item ${index + 1}`,
+          tab_content: cleanHtml((contents[index] as HTMLElement | undefined)?.innerHTML || ""),
+        }));
+      }
+      break;
+    }
+    case "icon-list": {
+      const items = Array.from(container.querySelectorAll(".elementor-icon-list-item, li"));
+      if (items.length) {
+        settings.icon_list = items.map((item) => {
+          const link = item.querySelector("a[href]");
+          return {
+            text: item.textContent?.trim() || "",
+            link: { url: link?.getAttribute("href") || "" },
+            selected_icon: { value: "fas fa-check", library: "fa-solid" },
+          };
+        });
+      }
+      break;
+    }
+    case "html":
+      settings.html = html;
+      break;
+    default:
+      if (!Object.keys(settings).length) {
+        settings.html = html || el.textContent?.trim() || "";
+      }
+      break;
+  }
+
+  return settings;
+}
+
 function extractCurrentPageTemplate(): ElementorTemplate | null {
   // First try to get data from window.elementorFrontendConfig
   const windowData = getWindowElementorData();
   let content: Record<string, unknown>[] = [];
   let pageSettings: Record<string, unknown> = {};
   let pageId = "";
-  let title = document.querySelector("h1")?.textContent?.trim() ||
+  const title = document.querySelector("h1")?.textContent?.trim() ||
     document.title?.replace(/[-–|].*$/, "").trim() ||
     "Untitled Template";
 
@@ -199,11 +361,8 @@ function extractCurrentPageTemplate(): ElementorTemplate | null {
 
   return {
     id: parseInt(pageId) || 0,
-    title,
-    type: "page",
-    content: JSON.stringify(content),
-    pageSettings,
-  };
+    ...toImportableTemplateFields({ title, type: "page", content, pageSettings }),
+  } as ElementorTemplate;
 }
 
 function parseElementData(el: Record<string, unknown>): Record<string, unknown> | null {
@@ -226,16 +385,22 @@ function parseElementData(el: Record<string, unknown>): Record<string, unknown> 
   }
 
   const id = el.id as string || Math.random().toString(16).substring(2, 10);
-  const elType = (el.type as string) || "section";
+  const elType = (el.elType as string) || (el.type as string) || "section";
   const elements = (el.elements as Record<string, unknown>[]) || [];
 
-  return {
+  const result: Record<string, unknown> = {
     id,
     elType,
     isInner: el.isInner as boolean || false,
     settings: Object.keys(settings).length > 0 ? settings : [],
     elements: elements.map(parseElementData).filter(Boolean),
   };
+
+  if (elType === "widget") {
+    result.widgetType = (el.widgetType as string) || "html";
+  }
+
+  return result;
 }
 
 export type DetectedSectionType = "header" | "footer" | "section" | "popup" | "unknown";
@@ -316,34 +481,15 @@ function parseElementFromDOM(el: HTMLElement): Record<string, unknown> | null {
   if (isWidget) elType = "widget";
   if (isContainer) elType = "container";
 
-  const dataSettings = el.getAttribute("data-settings");
-  let settings: Record<string, unknown> = {};
-  if (dataSettings) {
-    try {
-      const decoded = decodeHtmlEntities(dataSettings);
-      settings = JSON.parse(decoded);
-    } catch {
-      try {
-        settings = JSON.parse(dataSettings);
-      } catch { /* ignore */ }
-    }
-  }
+  const settings: Record<string, unknown> = parseSettingsAttribute(el);
 
-  // Recursively get child elements
   const childElements: Record<string, unknown>[] = [];
 
-  // Find widgets inside this element
-  el.querySelectorAll(":scope > .elementor-widget").forEach((widget) => {
-    const parsed = parseElementFromDOM(widget as HTMLElement);
+  getDirectElementorChildren(el).forEach((child) => {
+    const parsed = child.className.includes("elementor-widget")
+      ? extractWidgetForTemplate(child)
+      : parseElementFromDOM(child);
     if (parsed) childElements.push(parsed);
-  });
-
-  // Find columns/containers inside this element
-  el.querySelectorAll(":scope > .elementor-column, :scope > .elementor-column-wrap, :scope > .e-con").forEach((col) => {
-    if (col !== el) {
-      const parsed = parseElementFromDOM(col as HTMLElement);
-      if (parsed) childElements.push(parsed);
-    }
   });
 
   const detectedType = detectSectionType(el);
@@ -362,11 +508,9 @@ function parseElementFromDOM(el: HTMLElement): Record<string, unknown> | null {
 function extractTemplateContent(typeEl: Element): Record<string, unknown>[] {
   const content: Record<string, unknown>[] = [];
 
-  const directChildren = typeEl.querySelectorAll(
-    ":scope > .elementor-section, :scope > .e-con, :scope > .elementor-container"
-  );
+  const directChildren = getDirectElementorChildren(typeEl);
 
-  for (const child of Array.from(directChildren)) {
+  for (const child of directChildren) {
     const el = extractElementForTemplate(child as HTMLElement);
     if (el) content.push(el);
   }
@@ -399,31 +543,16 @@ function extractElementForTemplate(el: HTMLElement): Record<string, unknown> | n
   if (isColumn) elType = "column";
 
   const settings: Record<string, unknown> = {};
-  const dataSettings = el.getAttribute("data-settings");
-  if (dataSettings) {
-    try {
-      Object.assign(settings, JSON.parse(dataSettings));
-    } catch {}
-  }
+  Object.assign(settings, parseSettingsAttribute(el));
 
   const elements: Record<string, unknown>[] = [];
 
-  const widgets = el.querySelectorAll(":scope > .elementor-widget");
-  for (const w of Array.from(widgets)) {
-    const widget = extractWidgetForTemplate(w as HTMLElement);
-    if (widget) elements.push(widget);
-  }
-
-  const childContainers = el.querySelectorAll(
-    ":scope > .elementor-container, :scope > .elementor-column, :scope > .e-con"
-  );
-  for (const cc of Array.from(childContainers)) {
-    const childEl = cc as HTMLElement;
-    if (childEl !== el) {
-      const sub = extractElementForTemplate(childEl);
-      if (sub) elements.push(sub);
-    }
-  }
+  getDirectElementorChildren(el).forEach((childEl) => {
+    const child = childEl.className.includes("elementor-widget")
+      ? extractWidgetForTemplate(childEl)
+      : extractElementForTemplate(childEl);
+    if (child) elements.push(child);
+  });
 
   const detectedType = detectSectionType(el);
   const result: Record<string, unknown> = {
@@ -441,24 +570,37 @@ function extractElementForTemplate(el: HTMLElement): Record<string, unknown> | n
 function extractWidgetForTemplate(el: HTMLElement): Record<string, unknown> | null {
   const widgetType = el.getAttribute("data-widget_type") ||
     el.getAttribute("data-elementor-widget-type") || "";
-  if (!widgetType) return null;
-
   const cleanType = widgetType.split(".")[0];
-  const settings: Record<string, unknown> = {};
-  const dataSettings = el.getAttribute("data-settings");
-  if (dataSettings) {
-    try {
-      Object.assign(settings, JSON.parse(dataSettings));
-    } catch {}
-  }
+  const settings = extractWidgetSettingsFromDOM(el, cleanType || "html");
 
   return {
     id: el.getAttribute("data-id") || Math.random().toString(16).substring(2, 10),
     elType: "widget",
-    widgetType: cleanType,
+    widgetType: cleanType || "html",
     isInner: false,
     settings: Object.keys(settings).length > 0 ? settings : [],
     elements: [],
+  };
+}
+
+function toImportableTemplateFields(input: {
+  title: string;
+  type: ElementorTemplate["type"];
+  content: unknown;
+  pageSettings?: Record<string, unknown>;
+}): Omit<ElementorTemplate, "id"> {
+  const normalized = normalizeElementorTemplate({
+    title: input.title,
+    type: input.type,
+    pageSettings: input.pageSettings || {},
+    content: input.content,
+  });
+
+  return {
+    title: normalized.title,
+    type: normalized.type as ElementorTemplate["type"],
+    content: stringifyElementorContent(normalized.content),
+    pageSettings: normalized.page_settings as Record<string, unknown>,
   };
 }
 
@@ -561,11 +703,13 @@ export function extractSelectedSections(sectionIds: string[]): ElementorTemplate
     for (const section of allSections) {
       templates.push({
         id: section.id as unknown as number,
-        title: section.title,
-        type: mapToValidTemplateType(section.sectionType),
-        content: JSON.stringify(section.element),
-        pageSettings: {},
-      });
+        ...toImportableTemplateFields({
+          title: section.title,
+          type: mapToValidTemplateType(section.sectionType),
+          content: [section.element],
+          pageSettings: {},
+        }),
+      } as ElementorTemplate);
     }
   } else {
     // Extract specific sections by ID
@@ -575,11 +719,13 @@ export function extractSelectedSections(sectionIds: string[]): ElementorTemplate
         const sectionType = detectSectionType(el);
         templates.push({
           id: id as unknown as number,
-          title: `${sectionType} (#${id})`,
-          type: mapToValidTemplateType(sectionType),
-          content: JSON.stringify(parseElementFromDOM(el) || {}),
-          pageSettings: {},
-        });
+          ...toImportableTemplateFields({
+            title: `${sectionType} (#${id})`,
+            type: mapToValidTemplateType(sectionType),
+            content: [parseElementFromDOM(el) || {}],
+            pageSettings: {},
+          }),
+        } as ElementorTemplate);
       }
     }
   }
